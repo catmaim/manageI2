@@ -206,6 +206,7 @@ function getCategoryColor(cat: string) {
     case 'Scam': return 'bg-blue-100 text-blue-700 border border-blue-200';
     case 'Porn': return 'bg-orange-100 text-orange-700 border border-orange-200';
     case 'Gun': return 'bg-slate-800 text-white border border-slate-900';
+    case 'PPT': return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
     case 'Field Ops': return 'bg-orange-100 text-orange-700 border border-orange-200';
     default: return 'bg-slate-100 text-slate-700 border border-slate-200';
   }

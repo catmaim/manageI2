@@ -324,8 +324,10 @@ function getCategoryColor(cat: string) {
   switch (cat) {
     case 'Gambling': return 'bg-red-50 text-red-700 border-red-100';
     case 'Scam': return 'bg-blue-50 text-blue-700 border-blue-100';
-    case 'Gun': return 'bg-slate-900 text-white border-slate-800';
-    case 'Field Ops': return 'bg-orange-50 text-orange-700 border-orange-100';
+    case 'Gun': return 'bg-slate-800 text-white border border-slate-800';
+    case 'PPT': return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
+    case 'Field Ops': return 'bg-orange-50 text-orange-700 border border-orange-100';
+
     default: return 'bg-slate-50 text-slate-600 border-slate-100';
   }
 }

@@ -128,13 +128,14 @@ export default function EditTaskPage({ params }: { params: Params }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">ประเภทความผิด</label>
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">ประเภทงาน</label>
                   <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-800"
                     value={formData.crime_category} onChange={(e) => setFormData({...formData, crime_category: e.target.value})}>
                     <option value="Gambling">เว็บพนัน (Gambling)</option>
                     <option value="Scam">หลอกลวง (Scam)</option>
                     <option value="Porn">สื่อลามก (Porn)</option>
                     <option value="Gun">ปืนออนไลน์ (Online Gun)</option>
+                    <option value="PPT">PPT ประชุม (Presentation)</option>
                     <option value="Field Ops">งานสนาม (Field Ops)</option>
                     <option value="Admin">งานสารบรรณ (Admin)</option>
                     <option value="Other">อื่นๆ</option>
