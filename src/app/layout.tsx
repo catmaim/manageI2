@@ -1,5 +1,5 @@
 import './globals.css';
-import { LayoutDashboard, ClipboardList, ShieldCheck, Share2 } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, ShieldCheck, Share2, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <NavLink href="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
               <NavLink href="/tasks" icon={<ClipboardList size={18} />} label="รายการงาน" />
               <NavLink href="/strategic-map" icon={<Share2 size={18} />} label="Mission Map" />
+              <NavLink href="/ranking" icon={<Trophy size={18} />} label="Unit Ranking" />
             </div>
             <div className="p-4 border-t border-slate-700 text-center">
               <p className="text-[10px] text-slate-500 uppercase">System By Jake & Team</p>

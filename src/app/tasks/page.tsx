@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, ChevronDown, Edit3 } from 'lucide-react';
+import { Search, ChevronDown, Edit3, Calendar, FileText, Download } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [officers, setOfficers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter State
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
     fetchData();
@@ -38,6 +42,17 @@ export default function TasksPage() {
     }
   };
 
+  // Filter Logic for Monthly Reporting
+  const filteredTasks = tasks.filter(t => {
+    const taskDate = new Date(t.created_at);
+    return taskDate.getMonth() === selectedMonth && taskDate.getFullYear() === selectedYear;
+  });
+
+  const months = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+
   if (loading) return <div className="p-20 text-center font-black animate-pulse text-[#800000]">กำลังเชื่อมต่อ GGS2 Cloud...</div>;
 
   return (
@@ -46,20 +61,66 @@ export default function TasksPage() {
         <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Investigative Task Board</h1>
-            <p className="text-sm text-slate-500 font-medium tracking-wide">Live Data Management</p>
+            <p className="text-sm text-slate-500 font-medium tracking-wide">จัดการและติดตามสถานะงาน กก.สส.2</p>
           </div>
-          <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-96">
-            <Search size={18} className="text-slate-400 ml-2" />
-            <input type="text" placeholder="ค้นหาภารกิจ..." className="bg-transparent border-none focus:outline-none text-sm w-full font-bold" />
+          
+          <div className="flex flex-wrap items-center gap-3">
+             {/* Month/Year Selection for Reporting */}
+             <div className="flex items-center bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm gap-3">
+                <Calendar size={16} className="text-[#800000]" />
+                <select 
+                  value={selectedMonth} 
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className="bg-transparent text-xs font-bold outline-none text-slate-700 cursor-pointer"
+                >
+                  {months.map((m, idx) => <option key={idx} value={idx}>{m}</option>)}
+                </select>
+                <select 
+                  value={selectedYear} 
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="bg-transparent text-xs font-bold outline-none text-slate-700 cursor-pointer"
+                >
+                  {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y + 543}</option>)}
+                </select>
+             </div>
+
+             <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-64">
+                <Search size={18} className="text-slate-400 ml-2" />
+                <input type="text" placeholder="ค้นหาภารกิจ..." className="bg-transparent border-none focus:outline-none text-xs w-full font-bold" />
+             </div>
           </div>
         </header>
+
+        {/* Monthly Summary Insight */}
+        <div className="bg-[#800000] text-white p-6 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-6 shadow-xl shadow-[#800000]/20">
+           <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-xl backdrop-blur-md"><FileText size={24} /></div>
+              <div>
+                 <h2 className="text-lg font-black uppercase tracking-tight">รายงานประจำเดือน{months[selectedMonth]} {selectedYear + 543}</h2>
+                 <p className="text-xs text-red-100/70 font-bold uppercase tracking-widest">สรุปผลการปฏิบัติงานของหน่วย</p>
+              </div>
+           </div>
+           <div className="flex gap-8">
+              <div className="text-center">
+                 <p className="text-[10px] font-black uppercase opacity-60">งานเข้าทั้งหมด</p>
+                 <p className="text-2xl font-black">{filteredTasks.length}</p>
+              </div>
+              <div className="text-center">
+                 <p className="text-[10px] font-black uppercase opacity-60">ปิดงานสำเร็จ</p>
+                 <p className="text-2xl font-black text-green-400">{filteredTasks.filter(t => t.status === 'Completed').length}</p>
+              </div>
+              <button className="bg-white text-[#800000] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-colors flex items-center gap-2">
+                 <Download size={14} /> Export Report
+              </button>
+           </div>
+        </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
              <div className="flex items-center gap-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-               <span>Total Missions: {tasks.length}</span>
+               <span>Found: {filteredTasks.length} Missions</span>
              </div>
-            <Link href="/tasks/new" className="bg-[#800000] text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-800 transition-all shadow-md active:scale-95">
+            <Link href="/tasks/new" className="bg-[#800000] text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-800 transition-all shadow-md">
               + มอบหมายงานใหม่
             </Link>
           </div>
@@ -71,11 +132,11 @@ export default function TasksPage() {
                   <th className="px-6 py-5">ภารกิจ</th>
                   <th className="px-6 py-5">ผู้รับผิดชอบ</th>
                   <th className="px-6 py-5">สถานะงาน</th>
-                  <th className="px-6 py-5 text-right">อัปเดตล่าสุด</th>
+                  <th className="px-6 py-5 text-right">วันบันทึก / วันสำเร็จ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {tasks.map(task => {
+                {filteredTasks.length > 0 ? filteredTasks.map(task => {
                   const assigned = officers.find(o => o.id === task.assigned_to);
                   return (
                     <tr key={task.id} className="hover:bg-slate-50/80 transition-colors group">
@@ -114,13 +175,22 @@ export default function TasksPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                         <span className="text-[10px] font-bold text-slate-400">
-                           {task.completed_at ? `เสร็จเมื่อ: ${new Date(task.completed_at).toLocaleDateString('th-TH')}` : `Deadline: ${task.due_date ? new Date(task.due_date).toLocaleDateString('th-TH') : '-'}`}
-                         </span>
+                         <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-bold text-slate-400">เข้าเมื่อ: {new Date(task.created_at).toLocaleDateString('th-TH')}</span>
+                            {task.completed_at && (
+                                <span className="text-[10px] font-black text-green-600 uppercase mt-1">เสร็จเมื่อ: {new Date(task.completed_at).toLocaleDateString('th-TH')}</span>
+                            )}
+                         </div>
                       </td>
                     </tr>
                   );
-                })}
+                }) : (
+                  <tr>
+                    <td colSpan={4} className="p-20 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">
+                       ไม่มีภารกิจถูกบันทึกในเดือนนี้
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -137,7 +207,6 @@ function getCategoryColor(cat: string) {
     case 'Porn': return 'bg-orange-100 text-orange-700 border border-orange-200';
     case 'Gun': return 'bg-slate-800 text-white border border-slate-900';
     case 'Field Ops': return 'bg-orange-100 text-orange-700 border border-orange-200';
-
     default: return 'bg-slate-100 text-slate-700 border border-slate-200';
   }
 }
