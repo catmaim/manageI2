@@ -1,65 +1,141 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { LayoutDashboard, Users, ClipboardList, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+
+export default function Dashboard() {
+  const [officers, setOfficers] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      const { data: officersData } = await supabase.from('officers').select('*');
+      const { data: tasksData } = await supabase.from('tasks').select('*');
+      
+      if (officersData) setOfficers(officersData);
+      if (tasksData) setTasks(tasksData);
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="text-[#800000] font-black animate-pulse">กำลังดึงข้อมูลจาก GGS2 Cloud...</div>
+    </div>
+  );
+
+  const activeTasks = tasks.filter(t => t.status !== 'Completed').length;
+  const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+  const totalOfficers = officers.length;
+  const highRiskTasks = tasks.filter(t => t.difficulty_score >= 4).length;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-[#800000] text-white p-4 shadow-lg flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="bg-white p-2 rounded-full shadow-inner">
+            <LayoutDashboard className="text-[#800000]" size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight">GGS2 Management Portal</h1>
+            <p className="text-[10px] text-slate-200 font-bold uppercase tracking-widest">Live Cloud Data Mode</p>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <main className="p-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <StatCard title="งานที่กำลังดำเนินการ" value={activeTasks} icon={<ClipboardList size={20} />} color="border-l-4 border-blue-500" />
+          <StatCard title="งานที่สำเร็จแล้ว" value={completedTasks} icon={<ClipboardList size={20} />} color="border-l-4 border-green-500" />
+          <StatCard title="กำลังพลในระบบ" value={totalOfficers} icon={<Users size={20} />} color="border-l-4 border-[#800000]" />
+          <StatCard title="งานด่วน (ระดับ 4+)" value={highRiskTasks} icon={<AlertCircle size={20} />} color="border-l-4 border-orange-500" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-black mb-4 flex items-center gap-2 text-slate-800">
+              <Users size={20} className="text-[#800000]" />
+              สถานะภาระงาน (Workload Indicator)
+            </h2>
+            <div className="space-y-4">
+              {officers.map(officer => {
+                const officerTasks = tasks.filter(t => t.assigned_to === officer.id && t.status !== 'Completed');
+                const totalScore = officerTasks.reduce((sum, t) => sum + (t.difficulty_score || 1), 0);
+                const statusColor = totalScore >= 5 ? 'bg-red-500' : totalScore >= 3 ? 'bg-yellow-500' : 'bg-green-500';
+                
+                return (
+                  <Link key={officer.id} href={`/officers/${officer.id}`} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all group border border-transparent hover:border-[#800000]/20">
+                    <div>
+                      <p className="font-black text-slate-800 group-hover:text-[#800000]">{officer.nick_name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">{officer.specialty}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className={`h-1.5 w-24 rounded-full bg-slate-200 overflow-hidden shadow-inner`}>
+                        <div className={`h-full ${statusColor}`} style={{ width: `${Math.min(totalScore * 20, 100)}%` }}></div>
+                      </div>
+                      <p className="text-[10px] mt-1 font-black text-slate-500">LOAD: {totalScore}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-black mb-4 flex items-center gap-2 text-slate-800">
+              <AlertCircle size={20} className="text-[#800000]" />
+              งานวิกฤตที่ต้องเร่ง (High Priority)
+            </h2>
+            <div className="overflow-hidden">
+              <table className="w-full text-sm text-left">
+                <thead className="text-[10px] text-slate-400 uppercase font-black border-b border-slate-100">
+                  <tr>
+                    <th className="px-4 py-3">ภารกิจ</th>
+                    <th className="px-4 py-3 text-center">ระดับ</th>
+                    <th className="px-4 py-3">ผู้รับผิดชอบ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-medium">
+                  {tasks.filter(t => t.status !== 'Completed').sort((a, b) => (b.difficulty_score || 0) - (a.difficulty_score || 0)).slice(0, 5).map(task => {
+                    const assigned = officers.find(o => o.id === task.assigned_to);
+                    return (
+                      <tr key={task.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-4 text-slate-800 font-bold">{task.title}</td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black ${task.difficulty_score >= 4 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                            {task.difficulty_score}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Link href={`/officers/${assigned?.id}`} className="hover:text-[#800000] font-black transition-colors text-slate-600">
+                            {assigned?.nick_name || 'N/A'}
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon, color }: { title: string, value: number, icon: any, color: string }) {
+  return (
+    <div className={`bg-white p-6 rounded-2xl shadow-sm ${color} transition-all hover:shadow-md`}>
+      <div className="flex justify-between items-start mb-2">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{title}</p>
+        <div className="text-slate-300">{icon}</div>
+      </div>
+      <p className="text-3xl font-black text-slate-800 tracking-tighter">{value}</p>
     </div>
   );
 }

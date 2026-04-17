@@ -1,0 +1,22 @@
+# GGS2 Development Standards
+
+# Project Context
+You are developing the GGS2 Investigator Management Portal for พ.ต.ท.กฤษกร (กก.สส.2 บก.สส.ภ.8). The system is designed for high-security, high-reliability police operations.
+
+# Tech Stack
+- Framework: Next.js (App Router)
+- Styling: Tailwind CSS
+- Components: Shadcn/UI (Radix UI)
+- Backend: Supabase (Auth, Postgres, RLS)
+- Icons: Lucide React
+
+# Coding Rules
+- Modular Structure: Break components into reusable parts.
+- Type Safety: Use strict TypeScript interfaces for all data structures (Officer, Task).
+- Clean UI: Use the official police-themed color palette (#800000 Maroon, #ffd700 Gold).
+- Comments: Explain complex logic, especially scoring algorithms.
+
+# Security
+- Never log sensitive PII (ID cards, suspect names) to the console.
+- Always check for user authentication before rendering sensitive officer portfolios.
+- Ensure Row Level Security (RLS) is considered when designing database functions.
