@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     // ดึงรายชื่อเจ้าหน้าที่ทั้งหมดที่ยืนยันตัวตนแล้วมาเทียบ
     const { data: allOfficers } = await supabase
       .from('officers')
-      .select('line_user_id, nick_name, name')
+      .select('line_user_id, nick_name, name, line_display_name')
       .eq('line_status', 'approved');
 
     // ค้นหาคนที่ชื่อหรือชื่อเล่นไปโผล่ในชื่อตารางเวร
@@ -60,17 +60,17 @@ export async function GET(request: Request) {
     const mentions = [];
 
     if (officer?.line_user_id) {
-      const nick = officer.nick_name || 'เจ้าหน้าที่';
-      const tagPlaceholder = `@${nick}`;
-
+      // 🌟 ใช้ชื่อที่เขาใช้ในแอป LINE จริงๆ ในการ Tag (เพื่อให้ขึ้นสีฟ้า)
+      const tagText = `@${officer.line_display_name || officer.nick_name || 'เจ้าหน้าที่'}`;
+      
       // บันทึกตำแหน่ง: เริ่มที่ 0, ความยาวใช้ .length (UTF-16)
       mentions.push({
         index: 0,
-        length: tagPlaceholder.length,
+        length: tagText.length,
         userId: officer.line_user_id
       });
 
-      messageText = `${tagPlaceholder} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
+      messageText = `${tagText} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
     } else {
       messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
     }
