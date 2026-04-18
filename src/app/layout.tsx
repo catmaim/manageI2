@@ -44,9 +44,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               
               <div className="flex-grow p-4 mt-4 space-y-1 overflow-y-auto">
                 <NavLink href="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-                <NavLink href="/duty-roster" icon={<Calendar size={20} />} label="ตารางเวร" />
-                <NavLink href="/tasks" icon={<ClipboardList size={20} />} label="รายการงาน" />
+                <NavLink href="/duty-roster" icon={<ClipboardList size={20} />} label="ตารางเวร" />
+                <NavLink href="/tasks" icon={<ShieldCheck size={20} />} label="รายการงาน" />
+                <NavLink href="/officers" icon={<Users size={20} />} label="ข้อมูลกำลังพล" />
                 <NavLink href="/line-setup" icon={<MessageSquare size={20} />} label="LINE Bot" />
+
                 <NavLink href="/strategic-map" icon={<Share2 size={20} />} label="Mission Map" />
                 <NavLink href="/ranking" icon={<Trophy size={20} />} label="Unit Ranking" />
               </div>
