@@ -62,14 +62,13 @@ export default function Dashboard() {
       .from('officers')
       .update({ 
         line_status: status,
-        // ถ้าปฏิเสธ ให้ล้าง Line User ID ทิ้งด้วย
         line_user_id: status === 'rejected' ? null : undefined 
       })
       .eq('id', officerId);
 
     if (!error) {
-      alert(status === 'approved' ? 'อนุมัติการใช้งานเรียบร้อย!' : 'ปฏิเสธคำขอเรียบร้อย');
-      fetchDashboardData(); // โหลดข้อมูลใหม่
+      // ไม่ใช้ alert แล้ว แต่จะรีโหลดข้อมูลทันที
+      fetchDashboardData();
     }
   };
 
@@ -147,40 +146,70 @@ export default function Dashboard() {
       </header>
 
       <main className="p-6 max-w-7xl mx-auto">
-        {/* Pending Registration Approvals */}
+        {/* Pending Registration Approvals - Modernized UI */}
         {pendingApprovals.length > 0 && (
-          <div className="mb-8 bg-orange-50 border-2 border-orange-200 rounded-[32px] p-6 shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-orange-500 rounded-lg text-white">
-                <Users size={20} />
-              </div>
-              <h2 className="text-lg font-black text-orange-800 uppercase tracking-tight">คำขอลงทะเบียนใหม่ ({pendingApprovals.length})</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingApprovals.map(officer => (
-                <div key={officer.id} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100 flex justify-between items-center group hover:border-orange-300 transition-all">
-                  <div>
-                    <p className="font-black text-slate-800">{officer.rank}{officer.name}</p>
-                    <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">ชื่อเล่น: {officer.nick_name}</p>
+          <section className="mb-10 animate-in fade-in slide-in-from-top-6 duration-700">
+            <div className="bg-slate-900 rounded-[32px] p-8 shadow-2xl relative overflow-hidden border border-white/10">
+              {/* Background Decoration */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-[#ffd700] opacity-5 -mr-32 -mt-32 rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#800000] opacity-10 -ml-20 -mb-20 rounded-full blur-3xl"></div>
+              
+              <div className="relative z-10">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gradient-to-br from-[#ffd700] to-yellow-600 rounded-2xl shadow-lg shadow-yellow-500/20">
+                      <ShieldCheck size={24} className="text-slate-900" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-white uppercase tracking-tight">ศูนย์อนุมัติสิทธิ์เข้าใช้งาน</h2>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-0.5">Personnel Access Verification</p>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleApprove(officer.id, 'rejected')}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                    >
-                      ปฏิเสธ
-                    </button>
-                    <button 
-                      onClick={() => handleApprove(officer.id, 'approved')}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 shadow-md active:scale-95 transition-all"
-                    >
-                      อนุมัติ
-                    </button>
+                  <div className="px-4 py-1.5 bg-white/5 rounded-full border border-white/10">
+                    <span className="text-[#ffd700] text-[10px] font-black uppercase tracking-widest">
+                      {pendingApprovals.length} คำขอที่รอการตรวจสอบ
+                    </span>
                   </div>
                 </div>
-              ))}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingApprovals.map(officer => (
+                    <div key={officer.id} className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-2xl flex flex-col justify-between group hover:bg-white/10 transition-all duration-300">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-[#ffd700] transition-colors">
+                          <User size={20} />
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black text-slate-500 uppercase">Nickname</p>
+                          <p className="text-[#ffd700] font-black text-lg">{officer.nick_name}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-6">
+                        <p className="text-white font-black text-sm tracking-wide">{officer.rank}{officer.name}</p>
+                        <p className="text-slate-500 text-[9px] font-bold uppercase mt-1">Status: Pending Verification</p>
+                      </div>
+
+                      <div className="flex gap-2 pt-4 border-t border-white/5">
+                        <button 
+                          onClick={() => handleApprove(officer.id, 'rejected')}
+                          className="flex-1 py-2.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                        >
+                          ปฏิเสธ
+                        </button>
+                        <button 
+                          onClick={() => handleApprove(officer.id, 'approved')}
+                          className="flex-[2] py-2.5 bg-gradient-to-r from-yellow-500 to-[#ffd700] text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-yellow-500/20 active:scale-95 transition-all"
+                        >
+                          อนุมัติสิทธิ์
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
         {/* Today's Duty Highlight */}

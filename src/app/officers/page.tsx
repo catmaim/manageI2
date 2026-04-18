@@ -80,14 +80,17 @@ export default function OfficersManagement() {
   };
 
   const handleApproveInline = async (officerId: string) => {
+    // อัปเดตสถานะในฐานข้อมูล
     const { error } = await supabase
       .from('officers')
       .update({ line_status: 'approved' })
       .eq('id', officerId);
 
     if (!error) {
-      alert('อนุมัติเรียบร้อย!');
+      // ไม่ใช้ alert แล้ว แต่จะรีโหลดข้อมูลเพื่อแสดงไฟสีเขียวทันที
       fetchOfficers();
+    } else {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
     }
   };
 
