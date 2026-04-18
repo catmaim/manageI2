@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       .eq('line_status', 'approved');
 
     // ค้นหาคนที่ชื่อหรือชื่อเล่นไปโผล่ในชื่อตารางเวร
-    const officer = allOfficers?.find(o => 
+    const officer: any = allOfficers?.find(o => 
       (o.name && duty.officer_name.includes(o.name)) || 
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
@@ -86,6 +86,18 @@ export async function GET(request: Request) {
       day: 'numeric', month: 'long', year: 'numeric' 
     });
 
+    // 🕵️‍♂️ ค้นหารูปโปรไฟล์จาก Log ล่าสุด (เนื่องจากในตาราง officers ยังไม่มีช่องเก็บรูป)
+    const { data: lastLog } = await supabase
+      .from('system_logs')
+      .select('details')
+      .eq('log_type', 'LINE_MSG')
+      .eq('details->>sender', officer?.line_user_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const profileImg = (lastLog as any)?.details?.line_picture || "https://img5.pic.in.th/file/secure-sv1/police-logo.png";
+
     messages.push({
       type: 'flex',
       altText: `ประกาศเวรปฏิบัติการ: ${duty.officer_name}`,
@@ -103,11 +115,11 @@ export async function GET(request: Request) {
         },
         hero: {
           type: "image",
-          url: officer?.line_picture || "https://img5.pic.in.th/file/secure-sv1/police-logo.png", // ใช้รูปจากไลน์ ถ้าไม่มีใช้โลโก้ตำรวจ
+          url: profileImg,
           size: "full",
           aspectRatio: "1:1",
           aspectMode: "cover",
-          action: { type: "uri", uri: `https://manage-i2-snowy.vercel.app/verify?id=${officer?.id}` }
+          action: { type: "uri", uri: `https://manage-i2-snowy.vercel.app/verify` }
         },
         body: {
           type: "box",
