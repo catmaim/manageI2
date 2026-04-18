@@ -118,16 +118,34 @@ export async function POST(request: Request) {
 }
 
 async function replyLine(replyToken: string, message: string, token: string | undefined) {
-  if (!token) return;
-  await fetch('https://api.line.me/v2/bot/message/reply', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      replyToken,
-      messages: [{ type: 'text', text: message }]
-    }),
-  });
+  if (!token) {
+    console.error('❌ ERROR: LINE_CHANNEL_ACCESS_TOKEN is undefined!');
+    return { success: false, error: 'Token missing' };
+  }
+
+  try {
+    const response = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        replyToken,
+        messages: [{ type: 'text', text: message }]
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      console.error('❌ LINE API ERROR:', result);
+      return { success: false, error: result };
+    }
+
+    console.log('✅ LINE Reply Success:', result);
+    return { success: true, result };
+  } catch (error) {
+    console.error('❌ Fetch Error:', error);
+    return { success: false, error };
+  }
 }
