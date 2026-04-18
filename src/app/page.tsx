@@ -44,11 +44,18 @@ export default function Dashboard() {
   const handleNotifyLine = async (duty: any) => {
     setNotifying(true);
     try {
-      // ดึงข้อมูลกลุ่มหรือคนที่จะส่งจาก Database (ตัวอย่างนี้ใช้ Group ID จาก env หรือ config)
+      // ดึง ID ที่บันทึกไว้ในหน้า Line Setup (localStorage)
+      const targetId = localStorage.getItem('line_target_id');
+      
+      if (!targetId) {
+        alert('กรุณาไปตั้งค่า LINE Target ID ในหน้า Line Setup ก่อนครับ');
+        router.push('/line-setup');
+        return;
+      }
+
       const message = `📢 แจ้งเวรปฏิบัติการวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n👮 ชื่อ: ${duty.officer_name}\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #ManagementPortal`;
       
-      // ในที่นี้สมมติว่าส่งเข้ากลุ่มกลาง (ควรตั้งค่าในหน้า Line Setup)
-      const res = await sendLineMessage('ALL', message); 
+      const res = await sendLineMessage(targetId, message); 
       
       if (res.success) {
         alert('ส่งการแจ้งเตือนสำเร็จ!');
