@@ -88,10 +88,14 @@ export async function POST(request: Request) {
             .eq('line_user_id', senderId)
             .maybeSingle();
 
-          if (!officer) {
-            await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nรบกวนช่วยพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อเชื่อมต่อข้อมูลครับ", token);
-          } else if (officer.line_status === 'pending') {
-            await replyLine(replyToken, "⏳ บัญชีของคุณอยู่ระหว่าง [รอแอดมินอนุมัติ]\nโปรดรอสักครู่ หรือติดต่อหัวหน้ากฤษกรครับ", token);
+          // บอทจะตอบ 'ไม่รู้จัก' เฉพาะในแชทส่วนตัว (user) เท่านั้น
+          // ถ้าอยู่ในกลุ่ม (group/room) บอทจะเงียบ เพื่อไม่ให้รำคาญ
+          if (type === 'user') {
+            if (!officer) {
+              await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nรบกวนช่วยพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อเชื่อมต่อข้อมูลครับ\n\n(พิมพ์ 'วิธีใช้' เพื่อดูคำสั่งทั้งหมด)", token);
+            } else if (officer.line_status === 'pending') {
+              await replyLine(replyToken, "⏳ บัญชีของคุณอยู่ระหว่าง [รอแอดมินอนุมัติ]\nโปรดรอสักครู่ หรือติดต่อหัวหน้ากฤษกรครับ", token);
+            }
           }
         }
 
