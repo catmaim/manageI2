@@ -55,51 +55,126 @@ export async function GET(request: Request) {
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
 
-    // 4. เตรียมข้อความแจ้งเตือน (ใช้การนับ .length แบบมาตรฐาน UTF-16)
-    let messageText = '';
-    const mentions = [];
-
-    if (officer?.line_user_id) {
-      const tagText = `@${officer.line_display_name || officer.nick_name || 'เจ้าหน้าที่'}`;
-      mentions.push({
-        index: 0,
-        length: tagText.length,
-        userId: officer.line_user_id
-      });
-
-      messageText = `${tagText} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n\n⚠️ โปรดกดรับทราบภารกิจเพื่อยืนยันตัวตน:\nhttps://manage-i2-snowy.vercel.app/verify`;
-    } else {
-      messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
-    }
-
-
-    messageText += `\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
-
-    // 5. ส่งข้อความเข้า LINE
-    console.log('Sending message to LINE Group with Mentions...');
+    // 4. เตรียมข้อความและ Flex Message
     const targetId = process.env.LINE_GROUP_ID;
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-    const lineBody: any = {
-      to: targetId,
-      messages: [{ 
-        type: 'text', 
-        text: messageText
-      }]
-    };
-
-    // ใส่ข้อมูล Mention ถ้ามี
-    if (mentions.length > 0) {
-      lineBody.messages[0].mention = { mentions };
+    if (!targetId || !token) {
+      throw new Error('LINE Configuration missing');
     }
 
+    const messages = [];
+
+    // --- ข้อความที่ 1: สำหรับ Tag (Mention) ให้มือถือสั่น ---
+    if (officer?.line_user_id) {
+      const tagText = `@${officer.line_display_name || officer.nick_name || 'เจ้าหน้าที่'}`;
+      messages.push({
+        type: 'text',
+        text: `${tagText} ท่านมีภารกิจเข้าเวรวันนี้ครับ!`,
+        mention: {
+          mentions: [{
+            index: 0,
+            length: tagText.length,
+            userId: officer.line_user_id
+          }]
+        }
+      });
+    }
+
+    // --- ข้อความที่ 2: Flex Message การ์ดเวรสุดหรู ---
+    const dutyDateTh = new Date(duty.duty_date).toLocaleDateString('th-TH', { 
+      day: 'numeric', month: 'long', year: 'numeric' 
+    });
+
+    messages.push({
+      type: 'flex',
+      altText: `ประกาศเวรปฏิบัติการ: ${duty.officer_name}`,
+      contents: {
+        type: "bubble",
+        size: "giga",
+        header: {
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#800000",
+          contents: [
+            { type: "text", text: "GGS2 MISSION ALERT", color: "#ffd700", size: "xs", weight: "bold", tracking: "0.2em" },
+            { type: "text", text: "ประกาศเวรปฏิบัติหน้าที่", color: "#ffffff", size: "lg", weight: "bold", margin: "xs" }
+          ]
+        },
+        hero: {
+          type: "image",
+          url: officer?.line_picture || "https://img5.pic.in.th/file/secure-sv1/police-logo.png", // ใช้รูปจากไลน์ ถ้าไม่มีใช้โลโก้ตำรวจ
+          size: "full",
+          aspectRatio: "1:1",
+          aspectMode: "cover",
+          action: { type: "uri", uri: `https://manage-i2-snowy.vercel.app/verify?id=${officer?.id}` }
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { type: "text", text: duty.officer_name, weight: "bold", size: "xl", color: "#1e293b" },
+            { type: "text", text: duty.position || "ปฏิบัติหน้าที่เวรประจำวัน", size: "xs", color: "#64748b", margin: "xs" },
+            {
+              type: "box",
+              layout: "vertical",
+              margin: "lg",
+              spacing: "sm",
+              contents: [
+                {
+                  type: "box",
+                  layout: "baseline",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "🗓️ วันที่", color: "#94a3b8", size: "xs", flex: 2 },
+                    { type: "text", text: dutyDateTh, color: "#475569", size: "xs", flex: 5, weight: "bold" }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "baseline",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "📞 ติดต่อ", color: "#94a3b8", size: "xs", flex: 2 },
+                    { type: "text", text: duty.phone || "-", color: "#475569", size: "xs", flex: 5, weight: "bold" }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        footer: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "button",
+              action: {
+                type: "uri",
+                label: "✅ รับทราบงาน (ยืนยันพิกัด)",
+                uri: "https://manage-i2-snowy.vercel.app/verify"
+              },
+              style: "primary",
+              color: "#800000"
+            },
+            { type: "text", text: "โปรดรายงานตัวภายใน 15 นาที", color: "#94a3b8", size: "xxs", align: "center", margin: "md" }
+          ]
+        },
+        styles: {
+          footer: { separator: true }
+        }
+      }
+    });
+
+    // 5. ส่งข้อความเข้า LINE
+    console.log('Sending Premium Flex Message to LINE Group...');
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(lineBody),
+      body: JSON.stringify({ to: targetId, messages }),
     });
 
     if (!res.ok) {
