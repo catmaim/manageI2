@@ -55,25 +55,26 @@ export async function GET(request: Request) {
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
 
-    // 4. เตรียมข้อความแจ้งเตือน
+    // 4. เตรียมข้อความแจ้งเตือน (แก้ปัญหาตัวอักษรไทยด้วยการนับแบบละเอียด)
     const intro = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n`;
     
     let messageText = intro;
     const mentions = [];
 
     if (officer?.line_user_id) {
-      const nick = officer.nick_name || 'เจ้าหน้าที่';
-      const tagPlaceholder = `@${nick}`;
-      const actionText = `👉 ${tagPlaceholder} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
+      // ใช้สัญลักษณ์ @ เป็นจุดมาร์ค แล้วให้ LINE มาทับที่ตรงนี้
+      const tagText = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
+      const actionText = `👉 ${tagText} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
       
-      // คำนวณตำแหน่งเริ่มต้น (Index) ของ @Tag ในข้อความทั้งหมด
-      const startIndex = messageText.length + 3; // +3 มาจาก "👉 " (รวมช่องว่าง)
+      // วิธีการคำนวณที่ถูกต้องที่สุดสำหรับภาษาไทย: ใช้ [...str].length
+      const introLength = [...intro].length;
+      const tagStartIndex = introLength + 3; // +3 มาจาก "👉 "
       
       messageText += actionText;
 
       mentions.push({
-        index: startIndex,
-        length: tagPlaceholder.length,
+        index: tagStartIndex,
+        length: [...tagText].length,
         userId: officer.line_user_id
       });
     } else {
