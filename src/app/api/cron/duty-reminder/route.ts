@@ -55,30 +55,20 @@ export async function GET(request: Request) {
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
 
-    // 4. เตรียมข้อความแจ้งเตือน (แก้ปัญหาตัวอักษรไทยด้วยการนับแบบละเอียด)
-    const intro = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n`;
-    
-    let messageText = intro;
+    // 4. เตรียมข้อความแจ้งเตือน (ใช้ท่าไม้ตาย Index 0 เพื่อความชัวร์ 100%)
+    let messageText = '';
     const mentions = [];
 
     if (officer?.line_user_id) {
-      // ใช้สัญลักษณ์ @ เป็นจุดมาร์ค แล้วให้ LINE มาทับที่ตรงนี้
       const tagText = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
-      const actionText = `👉 ${tagText} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
-      
-      // วิธีการคำนวณที่ถูกต้องที่สุดสำหรับภาษาไทย: ใช้ [...str].length
-      const introLength = [...intro].length;
-      const tagStartIndex = introLength + 3; // +3 มาจาก "👉 "
-      
-      messageText += actionText;
-
       mentions.push({
-        index: tagStartIndex,
+        index: 0,
         length: [...tagText].length,
         userId: officer.line_user_id
       });
+      messageText = `${tagText} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
     } else {
-      messageText += `⚠️ แจ้งเตือน: โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ของท่านได้แล้วครับ!\n`;
+      messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
     }
 
     messageText += `\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
