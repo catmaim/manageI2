@@ -10,11 +10,10 @@ export async function POST(request: Request) {
 
     for (const event of events) {
       const eventSource = event.source;
-      const type = eventSource.type; // 'user', 'group', or 'room'
+      const type = eventSource.type; 
       const replyToken = event.replyToken;
-      const senderId = eventSource.userId; // ไอดีคนพิมพ์จริง (U...) เสมอ
+      const senderId = eventSource.userId;
       
-      // ระบุว่าต้องตอบกลับไปที่ไหน (ถ้าคุยในกลุ่มก็คือ Group ID, ถ้าคุยส่วนตัวก็คือ User ID)
       let targetId = '';
       if (type === 'group') targetId = eventSource.groupId;
       else if (type === 'room') targetId = eventSource.roomId;
@@ -23,26 +22,36 @@ export async function POST(request: Request) {
       if (event.type === 'message' && event.message.type === 'text') {
         const text = event.message.text.trim();
 
-        // --- 🔍 ค้นหาข้อมูลเจ้าหน้าที่จาก senderId (U...) ---
+        // --- 🕵️‍♂️ ปฏิบัติการดึงหน้ากาก (Fetch LINE Profile) ---
+        let lineProfile = { displayName: 'Unknown', pictureUrl: null };
+        if (senderId) {
+          const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${senderId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (profileRes.ok) {
+            lineProfile = await profileRes.json();
+          }
+        }
+
+        // --- 🔍 ค้นหาข้อมูลเจ้าหน้าที่จากฐานข้อมูลเรา ---
         const { data: currentOfficer } = await supabase
           .from('officers')
           .select('id, nick_name, rank, name, line_status')
           .eq('line_user_id', senderId)
           .maybeSingle();
 
-        // 1. คำสั่งพื้นฐาน (ทำงานทั้งในกลุ่มและส่วนตัว)
+        // 1. คำสั่งพื้นฐาน
         if (text === 'ช่วยเหลือ' || text === 'วิธีใช้' || text === 'help') {
           await replyLine(replyToken, `📋 คู่มือการใช้งาน GGS2 Bot\n\n1️⃣ ลงทะเบียน:\nพิมพ์ "ลงทะเบียน [ชื่อเล่น]"\n\n2️⃣ เช็คเวรวันนี้:\nพิมพ์ "ใครอยู่เวร"\n\n3️⃣ เช็คไอดี:\nพิมพ์ "เช็คไอดี"\n\n4️⃣ เช็คชื่อตัวเอง:\nพิมพ์ "ผมชื่ออะไร"`, token);
         }
         else if (text === 'เช็คไอดี') {
           await replyLine(replyToken, `🆔 ID ห้องนี้คือ:\n${targetId}\n\n👤 ID ของคุณคือ:\n${senderId}`, token);
         }
-        else if (text === 'ผมชื่ออะไร' || text === 'who am i') {
-          if (currentOfficer) {
-            await replyLine(replyToken, `👤 ข้อมูลของคุณในระบบ:\n\n👮‍♂️ ชื่อ: ${currentOfficer.rank}${currentOfficer.name}\n🔹 ชื่อเล่น: ${currentOfficer.nick_name}\n✅ สถานะ: ${currentOfficer.line_status}\n🆔 LINE ID: ${senderId}`, token);
-          } else {
-            await replyLine(replyToken, `❌ ระบบยังไม่รู้จักคุณครับ\n\nรหัสของคุณคือ: ${senderId}\nกรุณาพิมพ์ "ลงทะเบียน [ชื่อเล่น]" เพื่อยืนยันตัวตนครับ`, token);
-          }
+        else if (text === 'ผมชื่ออะไร') {
+          const identityMsg = currentOfficer 
+            ? `👤 ข้อมูลระบบ: ${currentOfficer.rank}${currentOfficer.name}\n📱 ชื่อ LINE: ${lineProfile.displayName}\n🆔 ID: ${senderId}`
+            : `❌ ระบบยังไม่รู้จักคุณครับ\n📱 ชื่อ LINE: ${lineProfile.displayName}\n🆔 ID: ${senderId}\n\nรบกวนพิมพ์ "ลงทะเบียน [ชื่อเล่น]" ครับ`;
+          await replyLine(replyToken, identityMsg, token);
         }
         else if (text === 'ใครอยู่เวร' || text === 'เวรวันนี้') {
           const today = new Date().toISOString().split('T')[0];
@@ -53,11 +62,11 @@ export async function POST(request: Request) {
             await replyLine(replyToken, `📅 วันนี้ยังไม่มีข้อมูลในตารางเวรครับ`, token);
           }
         }
-        // 2. การลงทะเบียน (ต้องพิม: ลงทะเบียน [ชื่อเล่น])
+        // 2. การลงทะเบียน
         else if (text.startsWith('ลงทะเบียน')) {
           const nickname = text.replace('ลงทะเบียน', '').trim();
           if (!nickname) {
-            await replyLine(replyToken, "กรุณาระบุชื่อเล่นด้วยครับ เช่น 'ลงทะเบียน บิว'", token);
+            await replyLine(replyToken, "กรุณาระบุชื่อเล่นด้วยครับ", token);
           } else {
             const { data } = await supabase
               .from('officers')
@@ -66,31 +75,30 @@ export async function POST(request: Request) {
               .select();
 
             if (data && data.length > 0) {
-              await replyLine(replyToken, `📝 รับคำขอลงทะเบียนของ "${data[0].nick_name}" แล้วครับ\n\n⚠️ สถานะ: [รอแอดมินอนุมัติ]\nแอดมินจะทำการยืนยันตัวตนให้คุณในระบบเร็วๆ นี้ครับ`, token);
-              await supabase.from('system_logs').insert([{ log_type: 'AUTH_REQUEST', message: `📢 คำขอใหม่: ${data[0].nick_name}`, details: { sender: senderId, officer_id: data[0].id } }]);
+              await replyLine(replyToken, `📝 รับคำขอของ "${data[0].nick_name}" แล้วครับ\n\n📱 ชื่อ LINE ของคุณ: ${lineProfile.displayName}\n⚠️ สถานะ: [รอแอดมินอนุมัติ]`, token);
+              await supabase.from('system_logs').insert([{ log_type: 'AUTH_REQUEST', message: `📢 คำขอใหม่จาก LINE: ${lineProfile.displayName} (ขอเป็น ${data[0].nick_name})`, details: { sender: senderId, officer_id: data[0].id, line_name: lineProfile.displayName } }]);
             } else {
-              await replyLine(replyToken, `❌ ไม่พบชื่อเล่น "${nickname}" ในระบบครับ\nรบกวนเช็คชื่อเล่นในหน้า Dashboard หรือติดต่อแอดมินครับ`, token);
+              await replyLine(replyToken, `❌ ไม่พบชื่อเล่น "${nickname}" ในระบบครับ`, token);
             }
           }
         }
-        // 3. กรณีคุยทั่วไป (เงียบในกลุ่ม, ตอบในแชทส่วนตัว)
+        // 3. กรณีคุยทั่วไป
         else if (type === 'user') {
           if (!currentOfficer) {
-            await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อรายงานตัวเข้าสู่ระบบนะครับ", token);
-          } else if (currentOfficer.line_status === 'pending') {
-            await replyLine(replyToken, "⏳ บัญชีของคุณอยู่ระหว่าง [รอแอดมินอนุมัติ]\nโปรดรอสักครู่ หรือติดต่อหัวหน้ากฤษกรครับ", token);
+            await replyLine(replyToken, `สวัสดีครับคุณ ${lineProfile.displayName}! 🤖\n\nรบกวนพิมพ์ "ลงทะเบียน [ชื่อเล่น]" เพื่อเริ่มต้นใช้งานนะครับ`, token);
           }
         }
 
-        // --- 📊 บันทึก Log ทุกการเคลื่อนไหว ---
-        const officerDisplayName = currentOfficer ? `${currentOfficer.rank}${currentOfficer.nick_name}` : 'Unknown';
+        // --- 📊 บันทึก Log พร้อมข้อมูลโปรไฟล์จริง ---
+        const officerDisplayName = currentOfficer ? `${currentOfficer.rank}${currentOfficer.nick_name}` : `LINE:${lineProfile.displayName}`;
         await supabase.from('system_logs').insert([{ 
           log_type: 'LINE_MSG', 
           message: `💬 [${officerDisplayName}] ${text}`, 
           details: { 
             target: targetId, 
             sender: senderId, 
-            type: type,
+            line_name: lineProfile.displayName,
+            line_picture: lineProfile.pictureUrl,
             officer_name: currentOfficer?.nick_name || null 
           }
         }]);
