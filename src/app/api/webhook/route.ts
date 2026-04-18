@@ -1,6 +1,32 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// --- 🛠️ HELPER FUNCTIONS ---
+async function replyFlex(replyToken: string, altText: string, contents: any, token: string | undefined) {
+  if (!token) return { success: false, error: 'Token missing' };
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ replyToken, messages: [{ type: 'flex', altText, contents }] }),
+    });
+    return { success: res.ok, status: res.status };
+  } catch (error) { return { success: false, error }; }
+}
+
+async function replyLine(replyToken: string, message: string, token: string | undefined) {
+  if (!token) return { success: false };
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text: message }] }),
+    });
+    return { success: res.ok };
+  } catch (error) { return { success: false }; }
+}
+
+// --- 🚀 MAIN WEBHOOK HANDLER ---
 export async function POST(request: Request) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   
@@ -22,7 +48,7 @@ export async function POST(request: Request) {
       if (event.type === 'message' && event.message.type === 'text') {
         const text = event.message.text.trim();
 
-        // --- 🕵️‍♂️ ดึงโปรไฟล์ LINE จริง ---
+        // 🕵️‍♂️ ดึงโปรไฟล์ LINE จริง
         let lineProfile = { displayName: 'Unknown', pictureUrl: null };
         if (senderId) {
           const profileRes = await fetch(`https://api.line.me/v2/bot/profile/${senderId}`, {
@@ -31,16 +57,14 @@ export async function POST(request: Request) {
           if (profileRes.ok) lineProfile = await profileRes.json();
         }
 
-        // --- 🔍 ค้นหาเจ้าหน้าที่ ---
+        // 🔍 ค้นหาเจ้าหน้าที่
         const { data: currentOfficer } = await supabase
           .from('officers')
           .select('id, nick_name, rank, name, line_status')
           .eq('line_user_id', senderId)
           .maybeSingle();
 
-        // --- 🎮 ระบบคำสั่ง (Commands) ---
-        
-        // 1. ผมชื่ออะไร (PREMIUM FLEX CARD)
+        // --- 🎮 คำสั่ง: ผมชื่ออะไร (Digital Badge) ---
         if (text === 'ผมชื่ออะไร' || text === 'who am i') {
           const badgeColor = currentOfficer?.line_status === 'approved' ? "#064e3b" : "#800000";
           const badgeStatus = currentOfficer?.line_status === 'approved' ? "✅ ยืนยันตัวตนสำเร็จ" : "⏳ รอการตรวจสอบ";
@@ -77,7 +101,7 @@ export async function POST(request: Request) {
                       { type: "text", text: `ID: ${senderId}`, color: "#ffffff", size: "xxs", opacity: 0.4, fontStyle: "italic" },
                       {
                         type: "button",
-                        action: { type: "uri", label: "📍 เช็คอินความมั่นคง (GPS)", uri: "https://manage-i2-snowy.vercel.app/verify" },
+                        action: { type: "uri", label: "📍 เช็คอินรายงานตัว (GPS)", uri: "https://manage-i2-snowy.vercel.app/verify" },
                         style: "secondary", height: "sm", color: "#ffffff", margin: "md"
                       }
                     ]
@@ -86,11 +110,12 @@ export async function POST(request: Request) {
               }]
             }
           };
-          await replyFlex(replyToken, "Digital Badge GGS2", flexBadge, token);
-          continue; // จบการทำงาน ไม่ต้องไปทำด้านล่างต่อ
+          const res = await replyFlex(replyToken, "Digital Badge GGS2", flexBadge, token);
+          console.log('Badge reply result:', res);
+          continue;
         }
 
-        // 2. คำสั่งอื่นๆ
+        // --- 🎮 คำสั่งอื่นๆ ---
         if (text === 'ช่วยเหลือ' || text === 'วิธีใช้' || text === 'help') {
           await replyLine(replyToken, `📋 คู่มือการใช้งาน GGS2 Bot\n\n1️⃣ ลงทะเบียน:\nพิมพ์ "ลงทะเบียน [ชื่อเล่น]"\n\n2️⃣ เช็คเวรวันนี้:\nพิมพ์ "ใครอยู่เวร"\n\n3️⃣ เช็คไอดี:\nพิมพ์ "เช็คไอดี"\n\n4️⃣ เช็คชื่อตัวเอง:\nพิมพ์ "ผมชื่ออะไร"`, token);
         }
@@ -101,7 +126,7 @@ export async function POST(request: Request) {
           const today = new Date().toISOString().split('T')[0];
           const { data: duty } = await supabase.from('duty_roster').select('*').eq('duty_date', today).maybeSingle();
           if (duty) await replyLine(replyToken, `👮‍♂️ เจ้าหน้าที่เวรวันนี้:\n${duty.officer_name}\n📞 ติดต่อ: ${duty.phone}`, token);
-          else await replyLine(replyToken, `📅 ยังไม่มีข้อมูลเวรครับ`, token);
+          else await replyLine(replyToken, `📅 วันนี้ยังไม่มีข้อมูลเวรครับ`, token);
         }
         else if (text.startsWith('ลงทะเบียน')) {
           const nickname = text.replace('ลงทะเบียน', '').trim();
@@ -130,28 +155,4 @@ export async function POST(request: Request) {
     console.error('Webhook Error:', error);
     return NextResponse.json({ success: false });
   }
-}
-
-async function replyFlex(replyToken: string, altText: string, contents: any, token: string | undefined) {
-  if (!token) return { success: false };
-  try {
-    const res = await fetch('https://api.line.me/v2/bot/message/reply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ replyToken, messages: [{ type: 'flex', altText, contents }] }),
-    });
-    return { success: res.ok };
-  } catch (error) { return { success: false }; }
-}
-
-async function replyLine(replyToken: string, message: string, token: string | undefined) {
-  if (!token) return { success: false };
-  try {
-    const res = await fetch('https://api.line.me/v2/bot/message/reply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text: message }] }),
-    });
-    return { success: res.ok };
-  } catch (error) { return { success: false }; }
 }
