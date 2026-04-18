@@ -9,16 +9,16 @@ export async function GET(request: Request) {
   const isVercelCron = request.headers.get('x-vercel-cron') === 'true';
   const cronSecret = process.env.CRON_SECRET;
 
-  console.log('Checking Auth...');
   if (authHeader !== `Bearer ${cronSecret}` && !isVercelCron) {
     console.error('❌ Unauthorized Attempt');
     return new Response('Unauthorized', { status: 401 });
   }
 
   try {
-    // 2. ดึงวันที่วันนี้ (เวลาไทย)
+    // 2. ดึงวันที่วันนี้ (เวลาไทย) 
     const now = new Date();
-    const dateString = new Intl.DateTimeFormat('fr-CA', { 
+    // 💡 ปรับมาใช้ en-CA แทน fr-CA เพื่อให้ได้รูปแบบ YYYY-MM-DD ที่เป็นมาตรฐานสากล
+    const dateString = new Intl.DateTimeFormat('en-CA', { 
       timeZone: 'Asia/Bangkok',
       year: 'numeric',
       month: '2-digit',
@@ -28,40 +28,37 @@ export async function GET(request: Request) {
     console.log(`📅 Target Date (Bangkok): ${dateString}`);
 
     // 3. ดึงข้อมูลเวรจาก Supabase
-    console.log('Searching database for duty...');
     const { data: duty, error: dbError } = await supabase
       .from('duty_roster')
       .select('*')
       .eq('duty_date', dateString)
       .maybeSingle();
 
-    if (dbError) {
-      console.error('❌ Supabase Error:', dbError);
-      throw new Error(`Database error: ${dbError.message}`);
+    if (dbError) throw new Error(`Database error: ${dbError.message}`);
+
+    // 🚨 แก้ไขจุดที่ 1: ดักจับกรณีไม่มีคนเข้าเวรวันนี้ เพื่อไม่ให้ระบบ Crash
+    if (!duty) {
+      console.log('✅ วันนี้ไม่มีเวรปฏิบัติการ ยกเลิกการแจ้งเตือน');
+      return NextResponse.json({ success: true, message: 'No duty today' });
     }
 
-    // 3. ค้นหาข้อมูลเจ้าหน้าที่เพื่อเอา LINE ID มา Tag (ปรับปรุงให้ฉลาดขึ้น)
     console.log(`Searching for officer: ${duty.officer_name}`);
     
-    // ดึงรายชื่อเจ้าหน้าที่ทั้งหมดที่ยืนยันตัวตนแล้วมาเทียบ
+    // ค้นหาคนที่มีรายชื่อตรงกันเพื่อเอา LINE ID ไป Tag
     const { data: allOfficers } = await supabase
       .from('officers')
       .select('line_user_id, nick_name, name, line_display_name')
       .eq('line_status', 'approved');
 
-    // ค้นหาคนที่ชื่อหรือชื่อเล่นไปโผล่ในชื่อตารางเวร
     const officer: any = allOfficers?.find(o => 
       (o.name && duty.officer_name.includes(o.name)) || 
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
 
-    // 4. เตรียมข้อความและ Flex Message
     const targetId = process.env.LINE_GROUP_ID;
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-    if (!targetId || !token) {
-      throw new Error('LINE Configuration missing');
-    }
+    if (!targetId || !token) throw new Error('LINE Configuration missing');
 
     const messages = [];
 
@@ -81,22 +78,26 @@ export async function GET(request: Request) {
       });
     }
 
+    // 🚨 แก้ไขจุดที่ 2: ดึงรูปโปรไฟล์จาก LINE API โดยตรง (รูปจะไม่หมดอายุ)
+    let profileImg = "https://img5.pic.in.th/file/secure-sv1/police-logo.png";
+    if (officer?.line_user_id) {
+      try {
+        const pRes = await fetch(`https://api.line.me/v2/bot/profile/${officer.line_user_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (pRes.ok) {
+          const p = await pRes.json();
+          if (p.pictureUrl) profileImg = p.pictureUrl; // ได้รูปจริงล่าสุดเสมอ
+        }
+      } catch (e) {
+        console.error("ดึงรูปโปรไฟล์ไม่สำเร็จ:", e);
+      }
+    }
+
     // --- ข้อความที่ 2: Flex Message การ์ดเวรสุดหรู ---
     const dutyDateTh = new Date(duty.duty_date).toLocaleDateString('th-TH', { 
       day: 'numeric', month: 'long', year: 'numeric' 
     });
-
-    // 🕵️‍♂️ ค้นหารูปโปรไฟล์จาก Log ล่าสุด (เนื่องจากในตาราง officers ยังไม่มีช่องเก็บรูป)
-    const { data: lastLog } = await supabase
-      .from('system_logs')
-      .select('details')
-      .eq('log_type', 'LINE_MSG')
-      .eq('details->>sender', officer?.line_user_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const profileImg = (lastLog as any)?.details?.line_picture || "https://img5.pic.in.th/file/secure-sv1/police-logo.png";
 
     messages.push({
       type: 'flex',
@@ -115,7 +116,7 @@ export async function GET(request: Request) {
         },
         hero: {
           type: "image",
-          url: profileImg,
+          url: profileImg, // 🖼️ ใช้ตัวแปรที่เราดึงสดๆ มาใส่ตรงนี้
           size: "full",
           aspectRatio: "1:1",
           aspectMode: "cover",
@@ -178,7 +179,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // 5. ส่งข้อความเข้า LINE
+    // 5. ส่งข้อความเข้า LINE (เฉพาะในกลุ่ม)
     console.log('Sending Premium Flex Message to LINE Group...');
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
@@ -186,7 +187,7 @@ export async function GET(request: Request) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ to: targetId, messages }),
+      body: JSON.stringify({ to: targetId, messages }), // targetId คือ LINE_GROUP_ID
     });
 
     if (!res.ok) {

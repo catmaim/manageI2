@@ -157,26 +157,98 @@ export async function POST(request: Request) {
         const target = source.type === 'group' ? source.groupId : senderId;
         await replyText(replyToken, `🆔 ห้องนี้คือ: ${target}\n👤 คุณคือ: ${senderId}`, token);
       }
-      // 4. ใครอยู่เวร
+      // 4. ใครอยู่เวร (แสดง Flex Message พร้อมรูปโปรไฟล์)
       else if (text === 'ใครอยู่เวร') {
-        const today = new Date().toISOString().split('T')[0];
-        const { data: duty } = await supabase.from('duty_roster').select('officer_name').eq('duty_date', today).maybeSingle();
-        await replyText(replyToken, duty ? `👮‍♂️ เวรวันนี้: ${duty.officer_name}` : "📅 ยังไม่มีข้อมูลเวรครับ", token);
-      }
-      // 5. ลงทะเบียน [ชื่อเล่น]
-      else if (text.startsWith('ลงทะเบียน')) {
-        const nick = text.replace('ลงทะเบียน', '').trim();
-        if (!nick) { await replyText(replyToken, "กรุณาระบุชื่อเล่นด้วยครับ", token); }
-        else if (officer) { await replyText(replyToken, `⚠️ คุณลงทะเบียนแล้วในชื่อ "${officer.nick_name}"`, token); }
-        else {
-          const { data: nameTaken } = await supabase.from('officers').select('id').ilike('nick_name', `%${nick}%`).not('line_user_id', 'is', null).maybeSingle();
-          if (nameTaken) { await replyText(replyToken, `❌ ชื่อ "${nick}" มีผู้ใช้อื่นลงทะเบียนแล้วครับ`, token); }
-          else {
-            const { data } = await supabase.from('officers').update({ line_user_id: senderId, line_status: 'pending', line_display_name: lineProfile.displayName }).ilike('nick_name', `%${nick}%`).select();
-            if (data?.length) { await replyText(replyToken, `📝 รับคำขอของ "${nick}" แล้ว โปรดรอแอดมินอนุมัติครับ`, token); }
-            else { await replyText(replyToken, `❌ ไม่พบชื่อ "${nick}" ในระบบครับ`, token); }
+        const today = new Date().toISOString().split('T')[0]; // หาวันที่ปัจจุบัน
+        
+        // 1. หาว่าใครเข้าเวรวันนี้จากตาราง duty_roster
+        const { data: duty } = await supabase
+          .from('duty_roster')
+          .select('officer_name')
+          .eq('duty_date', today)
+          .maybeSingle();
+
+        if (!duty) {
+          await replyText(replyToken, "📅 ยังไม่มีข้อมูลเวรสำหรับวันนี้ครับ", token);
+          continue; // จบการทำงานสำหรับเงื่อนไขนี้
+        }
+
+        // 2. เอาชื่อคนเข้าเวร ไปค้นหา line_user_id ในตาราง officers
+        // (ค้นหาจากชื่อจริง หรือ ชื่อเล่น เผื่อไว้ทั้งสองแบบ)
+        const { data: dutyOfficer } = await supabase
+          .from('officers')
+          .select('line_user_id, rank, name, nick_name')
+          .or(`name.ilike.%${duty.officer_name}%,nick_name.ilike.%${duty.officer_name}%`)
+          .maybeSingle();
+
+        // 3. ดึงรูปโปรไฟล์จาก LINE (ถ้าเจอ line_user_id)
+        let dutyPicUrl = 'https://img5.pic.in.th/file/secure-sv1/police-logo.png'; // รูปโลโก้สำรอง
+        if (dutyOfficer?.line_user_id) {
+          try {
+            const pRes = await fetch(`https://api.line.me/v2/bot/profile/${dutyOfficer.line_user_id}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (pRes.ok) {
+              const p = await pRes.json();
+              if (p.pictureUrl) dutyPicUrl = p.pictureUrl;
+            }
+          } catch (e) {
+            console.error("ดึงรูปคนเข้าเวรไม่สำเร็จ:", e);
           }
         }
+
+        // 4. เตรียมชื่อที่จะแสดงผล
+        const displayDutyName = dutyOfficer 
+          ? `${dutyOfficer.rank || ''}${dutyOfficer.name || ''} (${dutyOfficer.nick_name || ''})` 
+          : duty.officer_name;
+
+        // 5. สร้าง Flex Message การ์ดแสดงคนเข้าเวร
+        const dutyFlex = {
+          type: "bubble",
+          hero: {
+            type: "image",
+            url: dutyPicUrl, // รูปโปรไฟล์คนเข้าเวร
+            size: "full",
+            aspectRatio: "1:1",
+            aspectMode: "cover"
+          },
+          body: {
+            type: "box", 
+            layout: "vertical", 
+            backgroundColor: "#f2f3f5", 
+            paddingAll: "20px",
+            contents: [
+              { 
+                type: "text", 
+                text: "📢 ประกาศเข้าเวรประจำวันนี้", 
+                color: "#c48651", // สีน้ำตาล
+                weight: "bold", 
+                size: "sm", 
+                align: "center" 
+              },
+              { 
+                type: "text", 
+                text: displayDutyName, 
+                color: "#cc0000", // สีแดง
+                weight: "bold", 
+                size: "xl", 
+                align: "center", 
+                wrap: true, 
+                margin: "md" 
+              },
+              { 
+                type: "text", 
+                text: `วันที่: ${today}`, 
+                color: "#555555", 
+                size: "sm", 
+                align: "center", 
+                margin: "sm" 
+              }
+            ]
+          }
+        };
+
+        await replyFlex(replyToken, `เวรวันนี้: ${displayDutyName}`, dutyFlex, token);
       }
       // 6. กรณีคุยส่วนตัว (ถ้ายังไม่ลงทะเบียน)
       else if (source.type === 'user' && !officer) {
