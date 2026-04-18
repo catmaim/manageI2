@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShieldCheck, MapPin, Wifi, Smartphone, Loader2, Lock } from 'lucide-react';
+import { ShieldCheck, MapPin, Wifi, Smartphone, Loader2, Lock, CheckCircle2 } from 'lucide-react';
 
 export default function DigitalID() {
   const [loading, setLoading] = useState(true);
