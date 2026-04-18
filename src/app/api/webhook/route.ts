@@ -69,45 +69,66 @@ export async function POST(request: Request) {
       
       // --- 🕹️ COMMANDS LOGIC ---
 
-      // 1. ผมชื่ออะไร (Digital Badge)
+      // 1. ผมชื่ออะไร (แบบในรูปตัวอย่าง)
       if (text === 'ผมชื่ออะไร') {
-        const badgeColor = officer?.line_status === 'approved' ? "#064e3b" : "#800000";
-        const badgeStatus = officer?.line_status === 'approved' ? "✅ ยืนยันตัวตนสำเร็จ" : "⏳ รออนุมัติ";
-        
         const badgeFlex = {
           type: "bubble",
-          // 🖼️ เพิ่มบล็อก hero เพื่อแสดงรูปโปรไฟล์ขนาดใหญ่เต็มหน้ากว้าง
           hero: {
             type: "image",
-            url: lineProfile.pictureUrl,
+            url: lineProfile.pictureUrl, // 🖼️ ดึงรูปโปรไฟล์จริงมาแสดง
             size: "full",
-            aspectRatio: "1:1", // บังคับรูปเป็นสี่เหลี่ยมจัตุรัส
-            aspectMode: "cover" // ไม่ให้รูปเบี้ยว
+            aspectRatio: "1:1",
+            aspectMode: "cover"
           },
           body: {
-            type: "box", layout: "vertical", backgroundColor: badgeColor, paddingAll: "0px",
+            type: "box", 
+            layout: "vertical", 
+            backgroundColor: "#f2f3f5", // พื้นหลังสีเทาอ่อนแบบในรูป
+            paddingAll: "20px",
             contents: [
-              // 📝 ส่วนที่ 1: ข้อมูลส่วนตัว (จัดกึ่งกลางให้เข้ากับรูปใหญ่)
-              {
-                type: "box", layout: "vertical", paddingAll: "20px",
-                contents: [
-                  { type: "text", text: officer?.nick_name || lineProfile.displayName, color: "#ffffff", weight: "bold", size: "xl", align: "center" },
-                  { type: "text", text: officer ? `${officer.rank || ''}${officer.name || ''}` : "ยังไม่ได้ลงทะเบียน", color: "#ffffff", size: "sm", opacity: 0.8, wrap: true, align: "center", margin: "sm" },
-                  { type: "text", text: badgeStatus, color: "#ffd700", size: "md", weight: "bold", align: "center", margin: "md" }
-                ]
-              },
-              // 🔘 ส่วนที่ 2: ไอดี และ ปุ่มกด
               { 
-                type: "box", layout: "vertical", paddingAll: "15px", backgroundColor: "#00000033", 
-                contents: [
-                  { type: "text", text: `ID: ${senderId}`, color: "#ffffff", opacity: 0.4, size: "xxs", wrap: true, align: "center" },
-                  { type: "button", action: { type: "uri", label: "📍 รายงานตัว (GPS)", uri: "https://manage-i2-snowy.vercel.app/verify" }, style: "primary", color: "#555555", margin: "md", height: "sm" }
-                ]
+                type: "text", 
+                text: "อายุการใช้งานของคุณหมดอายุแล้ว", 
+                color: "#cc0000", // สีแดง
+                weight: "bold", 
+                size: "xl", 
+                align: "center", 
+                wrap: true 
+              },
+              { 
+                type: "text", 
+                text: "วันที่หมดอายุของท่านคือวันที่ 21/09/2568.\nกรุณาติดต่อผู้ดูแลเพื่อทำการต่ออายุสมาชิก", 
+                color: "#555555", // สีเทาเข้ม
+                size: "sm", 
+                align: "center", 
+                wrap: true, 
+                margin: "lg" 
+              }
+            ]
+          },
+          footer: {
+            type: "box", 
+            layout: "vertical", 
+            backgroundColor: "#f2f3f5", 
+            paddingAll: "20px", 
+            paddingTop: "0px",
+            contents: [
+              { 
+                type: "button", 
+                action: { 
+                  type: "uri", 
+                  label: "ติดต่อผู้ดูแล", 
+                  // 🔗 ใส่ลิงก์ LINE ของแอดมิน หรือลิงก์ที่ต้องการให้กดตรงนี้ได้เลยครับ
+                  uri: "https://manage-i2-snowy.vercel.app/verify" 
+                }, 
+                style: "primary", 
+                color: "#c48651", // สีน้ำตาลแบบในรูป
+                height: "md" 
               }
             ]
           }
         };
-        await replyFlex(replyToken, "Digital Badge GGS2", badgeFlex, token);
+        await replyFlex(replyToken, "แจ้งเตือนสถานะการใช้งาน", badgeFlex, token);
       }
       // 2. วิธีใช้
       else if (text === 'วิธีใช้' || text === 'help' || text === 'ช่วยเหลือ') {
