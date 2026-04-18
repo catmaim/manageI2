@@ -9,6 +9,7 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [officers, setOfficers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [taskLimit, setTaskLimit] = useState(5); // จำกัด 5 รายการตามบอสสั่ง
 
   // Filter State
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -164,10 +165,11 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredTasks.length > 0 ? filteredTasks.map(task => {
+                {filteredTasks.length > 0 ? filteredTasks.slice(0, taskLimit).map(task => {
                   const assigned = officers.find(o => o.id === task.assigned_to);
                   return (
                     <tr key={task.id} className="hover:bg-slate-50/80 transition-colors group">
+                      {/* ... (rest of task row mapping stays the same) ... */}
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase mb-1 inline-block ${getCategoryColor(task.crime_category)}`}>
                           {task.crime_category || 'Other'}
@@ -231,6 +233,18 @@ export default function TasksPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Load More Button */}
+          {filteredTasks.length > taskLimit && (
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+              <button 
+                onClick={() => setTaskLimit(prev => prev + 5)}
+                className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-[#800000] transition-colors flex items-center gap-2 mx-auto"
+              >
+                ➕ โหลดภารกิจย้อนหลังเพิ่มเติม
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
