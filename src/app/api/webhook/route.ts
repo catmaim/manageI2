@@ -83,8 +83,8 @@ async function replyLine(replyToken: string, message: string, token: string | un
 
     console.log('✅ LINE API Success Response:', JSON.stringify(result));
     return { success: true, result };
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Fetch Exception:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error?.message || 'Unknown fetch error' };
   }
 }
