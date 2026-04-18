@@ -131,7 +131,7 @@ export async function POST(request: Request) {
           await replyText(replyToken, data?.length ? `📝 รับคำขอของ "${nick}" แล้ว รออนุมัติครับ` : `❌ ไม่พบชื่อ "${nick}"`, token);
         }
       }
-      else if (type === 'user' && !currentOfficer) {
+      else if (event.source.type === 'user' && !currentOfficer) {
         await replyText(replyToken, `สวัสดีครับคุณ ${lineProfile.displayName}! พิมพ์ "ลงทะเบียน [ชื่อเล่น]" เพื่อเริ่มงานครับ`, token);
       }
     }
