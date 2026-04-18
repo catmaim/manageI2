@@ -9,7 +9,8 @@ export default function OfficersManagement() {
   const [officers, setOfficers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null); // เพิ่ม state สำหรับเก็บ ID ที่กำลังแก้
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   
   // Form State
   const [newOfficer, setNewOfficer] = useState({
@@ -24,6 +25,12 @@ export default function OfficersManagement() {
     fetchOfficers();
   }, []);
 
+  // ฟังก์ชันแสดงแจ้งเตือนแบบ Toast
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000); // หายไปใน 3 วินาที
+  };
+
   async function fetchOfficers() {
     const { data } = await supabase.from('officers').select('*').order('rank', { ascending: true });
     if (data) setOfficers(data);
@@ -32,26 +39,26 @@ export default function OfficersManagement() {
 
   const handleAddOfficer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOfficer.name || !newOfficer.nick_name) return alert('กรุณากรอกชื่อและชื่อเล่นครับ');
+    if (!newOfficer.name || !newOfficer.nick_name) return showToast('กรุณากรอกชื่อและชื่อเล่นครับ', 'error');
 
     if (editingId) {
-      // โหมดแก้ไข
       const { error } = await supabase
         .from('officers')
         .update(newOfficer)
         .eq('id', editingId);
       
       if (error) {
-        alert('แก้ไขไม่สำเร็จ: ' + error.message);
+        showToast('แก้ไขไม่สำเร็จ: ' + error.message, 'error');
       } else {
-        alert('แก้ไขข้อมูลเรียบร้อย!');
+        showToast('อัปเดตข้อมูลเจ้าหน้าที่เรียบร้อยแล้ว');
         setEditingId(null);
       }
     } else {
-      // โหมดเพิ่มใหม่
       const { error } = await supabase.from('officers').insert([newOfficer]);
       if (error) {
-        alert('เกิดข้อผิดพลาด: ' + error.message);
+        showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+      } else {
+        showToast('บันทึกข้อมูลเจ้าหน้าที่ใหม่สำเร็จ');
       }
     }
 
@@ -69,28 +76,30 @@ export default function OfficersManagement() {
     });
     setEditingId(officer.id);
     setIsAdding(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // เลื่อนขึ้นไปบนสุดเพื่อให้เห็นฟอร์ม
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`ยืนยันการลบข้อมูลของ ${name} หรือไม่?`)) {
       const { error } = await supabase.from('officers').delete().eq('id', id);
-      if (!error) fetchOfficers();
+      if (!error) {
+        showToast('ลบข้อมูลเรียบร้อยแล้ว');
+        fetchOfficers();
+      }
     }
   };
 
   const handleApproveInline = async (officerId: string) => {
-    // อัปเดตสถานะในฐานข้อมูล
     const { error } = await supabase
       .from('officers')
       .update({ line_status: 'approved' })
       .eq('id', officerId);
 
     if (!error) {
-      // ไม่ใช้ alert แล้ว แต่จะรีโหลดข้อมูลเพื่อแสดงไฟสีเขียวทันที
+      showToast('อนุมัติสิทธิ์การใช้งาน LINE เรียบร้อย');
       fetchOfficers();
     } else {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
+      showToast('เกิดข้อผิดพลาดในการอนุมัติ', 'error');
     }
   };
 
@@ -242,6 +251,28 @@ export default function OfficersManagement() {
           </div>
         </div>
       </main>
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-8 right-8 z-[100] animate-in slide-in-from-right-10 duration-300">
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+            toast.type === 'success' 
+              ? 'bg-slate-900 border-[#ffd700]/20 text-white' 
+              : 'bg-red-900 border-red-500/20 text-white'
+          }`}>
+            {toast.type === 'success' ? (
+              <div className="p-1 bg-[#ffd700] rounded-full text-slate-900">
+                <CheckCircle2 size={16} />
+              </div>
+            ) : (
+              <div className="p-1 bg-red-500 rounded-full text-white">
+                <Shield size={16} />
+              </div>
+            )}
+            <p className="font-black text-sm uppercase tracking-wide">{toast.message}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
