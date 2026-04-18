@@ -135,8 +135,11 @@ export default function Dashboard() {
           </div>
         </div>
         <nav className="hidden md:flex items-center gap-4">
-          <Link href="/" className="text-[10px] font-black uppercase tracking-widest px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">Dashboard</Link>
-          <Link href="/duty-roster" className="text-[10px] font-black uppercase tracking-widest px-3 py-2 text-[#ffd700] border border-[#ffd700]/30 rounded-lg hover:bg-[#ffd700]/10 transition-colors flex items-center gap-2">
+          <Link href="/officers" className="text-[10px] font-black uppercase tracking-widest px-3 py-2 bg-white/10 text-[#ffd700] border border-[#ffd700]/30 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2">
+            <Users size={14} />
+            จัดการกำลังพล
+          </Link>
+          <Link href="/duty-roster" className="text-[10px] font-black uppercase tracking-widest px-3 py-2 text-white border border-white/20 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-2">
             <ClipboardList size={14} />
             ตารางเวร
           </Link>
