@@ -9,7 +9,8 @@ import {
   Trophy, 
   LogOut, 
   Calendar, 
-  MessageSquare 
+  MessageSquare,
+  Users 
 } from 'lucide-react';
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
