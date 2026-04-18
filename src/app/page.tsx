@@ -2,31 +2,76 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, Users, ClipboardList, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, AlertCircle, Phone, LogOut, Send } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { sendLineMessage } from '@/lib/line';
 
 export default function Dashboard() {
   const [officers, setOfficers] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [roster, setRoster] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notifying, setNotifying] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    async function fetchData() {
+    async function checkUserAndFetchData() {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
       const { data: officersData } = await supabase.from('officers').select('*');
       const { data: tasksData } = await supabase.from('tasks').select('*');
+      const { data: rosterData } = await supabase.from('duty_roster').select('*').order('duty_date', { ascending: true });
       
       if (officersData) setOfficers(officersData);
       if (tasksData) setTasks(tasksData);
+      if (rosterData) setRoster(rosterData);
       setLoading(false);
     }
-    fetchData();
-  }, []);
+    checkUserAndFetchData();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
+  const handleNotifyLine = async (duty: any) => {
+    setNotifying(true);
+    try {
+      // ดึงข้อมูลกลุ่มหรือคนที่จะส่งจาก Database (ตัวอย่างนี้ใช้ Group ID จาก env หรือ config)
+      const message = `📢 แจ้งเวรปฏิบัติการวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n👮 ชื่อ: ${duty.officer_name}\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #ManagementPortal`;
+      
+      // ในที่นี้สมมติว่าส่งเข้ากลุ่มกลาง (ควรตั้งค่าในหน้า Line Setup)
+      const res = await sendLineMessage('ALL', message); 
+      
+      if (res.success) {
+        alert('ส่งการแจ้งเตือนสำเร็จ!');
+      } else {
+        alert('เกิดข้อผิดพลาด: ' + (res.error?.message || 'ไม่สามารถส่งข้อความได้'));
+      }
+    } catch (error) {
+      console.error(error);
+      alert('ระบบขัดข้อง');
+    } finally {
+      setNotifying(false);
+    }
+  };
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="text-[#800000] font-black animate-pulse">กำลังดึงข้อมูลจาก GGS2 Cloud...</div>
+      <div className="text-[#800000] font-black animate-pulse uppercase tracking-widest text-sm">กำลังเชื่อมต่อ GGS2 Secure Cloud...</div>
     </div>
   );
+
+  // Find today's duty officer
+  const today = new Date().toISOString().split('T')[0];
+  const todayDuty = roster.find(r => r.duty_date === today) || (roster.length > 0 ? roster[0] : null);
 
   const activeTasks = tasks.filter(t => t.status !== 'Completed').length;
   const completedTasks = tasks.filter(t => t.status === 'Completed').length;
@@ -35,19 +80,63 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-[#800000] text-white p-4 shadow-lg flex justify-between items-center">
+      <header className="bg-[#800000] text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <div className="bg-white p-2 rounded-full shadow-inner">
             <LayoutDashboard className="text-[#800000]" size={24} />
           </div>
           <div>
             <h1 className="text-xl font-black uppercase tracking-tight">GGS2 Management Portal</h1>
-            <p className="text-[10px] text-slate-200 font-bold uppercase tracking-widest">Live Cloud Data Mode</p>
+            <p className="text-[10px] text-[#ffd700] font-bold uppercase tracking-widest">Live Cloud Data Mode</p>
           </div>
         </div>
+        <nav className="hidden md:flex items-center gap-4">
+          <Link href="/" className="text-[10px] font-black uppercase tracking-widest px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">Dashboard</Link>
+          <Link href="/duty-roster" className="text-[10px] font-black uppercase tracking-widest px-3 py-2 text-[#ffd700] border border-[#ffd700]/30 rounded-lg hover:bg-[#ffd700]/10 transition-colors flex items-center gap-2">
+            <ClipboardList size={14} />
+            ตารางเวร
+          </Link>
+        </nav>
       </header>
 
       <main className="p-6 max-w-7xl mx-auto">
+        {/* Today's Duty Highlight */}
+        {todayDuty && (
+          <div className="mb-8 bg-white rounded-3xl p-1 shadow-xl border border-slate-200 overflow-hidden group hover:shadow-2xl transition-all duration-500">
+            <div className="bg-[#800000] rounded-[22px] p-6 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[#ffd700] opacity-5 -mr-20 -mt-20 rounded-full"></div>
+              <div className="flex items-center gap-6 z-10">
+                <div className="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-md flex flex-col items-center justify-center border border-white/20 shadow-lg">
+                  <span className="text-[10px] font-black text-[#ffd700] uppercase tracking-widest">APR</span>
+                  <span className="text-3xl font-black text-white leading-none">{new Date(todayDuty.duty_date).getDate()}</span>
+                </div>
+                <div>
+                  <h2 className="text-[#ffd700] text-[10px] font-black uppercase tracking-[0.2em] mb-1 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#ffd700] animate-pulse"></div>
+                    เจ้าหน้าที่เวรปฏิบัติการวันนี้
+                  </h2>
+                  <p className="text-2xl font-black text-white leading-tight">{todayDuty.officer_name}</p>
+                  <p className="text-white/60 text-[10px] font-bold mt-1 uppercase tracking-wider">{todayDuty.position}</p>
+                </div>
+              </div>
+              <div className="flex flex-col md:flex-row items-end gap-3 z-10 w-full md:w-auto">
+                <button 
+                  onClick={() => handleNotifyLine(todayDuty)}
+                  disabled={notifying}
+                  className="w-full md:w-auto px-6 py-3 bg-white text-[#800000] rounded-xl font-black text-sm flex items-center justify-center gap-3 hover:bg-[#ffd700] transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                >
+                  <Send size={18} />
+                  {notifying ? 'กำลังส่ง...' : 'แจ้งเวรเข้า LINE'}
+                </button>
+                <a href={`tel:${todayDuty.phone}`} className="w-full md:w-auto px-6 py-3 bg-[#ffd700] text-[#800000] rounded-xl font-black text-sm flex items-center justify-center gap-3 hover:bg-white transition-all shadow-lg active:scale-95">
+                  <Phone size={18} />
+                  {todayDuty.phone}
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <StatCard title="งานที่กำลังดำเนินการ" value={activeTasks} icon={<ClipboardList size={20} />} color="border-l-4 border-blue-500" />
           <StatCard title="งานที่สำเร็จแล้ว" value={completedTasks} icon={<ClipboardList size={20} />} color="border-l-4 border-green-500" />

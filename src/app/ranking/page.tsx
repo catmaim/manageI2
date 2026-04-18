@@ -2,213 +2,239 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Trophy, Award, BarChart3, Calendar, Clock, TrendingUp, Filter, Target, Dices, Ghost, Shield } from 'lucide-react';
-import Link from 'next/link';
+import { Trophy, Medal, Star, Calendar, Filter, ArrowUp, Crown, ChevronLeft, ChevronRight } from 'lucide-react';
 
-type TimeRange = 'week' | 'month' | 'year' | 'all';
+type TimeRange = 'today' | 'month' | 'year' | 'all';
 
 export default function RankingPage() {
-  const [tasks, setTasks] = useState<any[]>([]);
   const [officers, setOfficers] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<TimeRange>('month');
   
-  // Filters
-  const [timeRange, setTimeRange] = useState<TimeRange>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  // Historical Selection State
+  const now = new Date();
+  const [selectedDate, setSelectedDate] = useState(now.toISOString().split('T')[0]);
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+
+  const monthsTh = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
 
   useEffect(() => {
     async function fetchData() {
-      const { data: o } = await supabase.from('officers').select('*');
-      const { data: t } = await supabase.from('tasks').select('*');
-      if (o) setOfficers(o);
-      if (t) setTasks(t);
+      const { data: officersData } = await supabase.from('officers').select('*');
+      const { data: tasksData } = await supabase.from('tasks').select('*').eq('status', 'Completed');
+      
+      if (officersData) setOfficers(officersData);
+      if (tasksData) setTasks(tasksData);
       setLoading(false);
     }
     fetchData();
   }, []);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="text-[#800000] font-black animate-pulse uppercase tracking-[0.2em]">Filtering Strategic Intelligence...</div>
-    </div>
-  );
-
-  // Filter Logic
-  const filterTasks = () => {
-    return tasks.filter(t => {
-      // Time Filter
-      let timeMatch = true;
-      if (timeRange !== 'all') {
-        const date = new Date(t.created_at);
-        const now = new Date();
-        const diffDays = Math.ceil(Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-        if (timeRange === 'week') timeMatch = diffDays <= 7;
-        else if (timeRange === 'month') timeMatch = diffDays <= 30;
-        else if (timeRange === 'year') timeMatch = diffDays <= 365;
+  const calculateRanking = () => {
+    const filteredTasks = tasks.filter(task => {
+      if (!task.completed_at) return false;
+      const compDate = new Date(task.completed_at);
+      
+      if (timeRange === 'today') {
+        const targetDate = new Date(selectedDate);
+        return compDate.toDateString() === targetDate.toDateString();
       }
-
-      // Category Filter
-      const categoryMatch = selectedCategory === 'all' || (t.crime_category || 'Other') === selectedCategory;
-
-      return timeMatch && categoryMatch;
+      if (timeRange === 'month') {
+        return compDate.getMonth() === selectedMonth && compDate.getFullYear() === selectedYear;
+      }
+      if (timeRange === 'year') {
+        return compDate.getFullYear() === selectedYear;
+      }
+      return true; // all
     });
+
+    return officers.map(officer => {
+      const officerTasks = filteredTasks.filter(t => t.assigned_to === officer.id);
+      const totalScore = officerTasks.reduce((sum, t) => sum + (t.difficulty_score || 1), 0);
+      return {
+        ...officer,
+        score: totalScore,
+        taskCount: officerTasks.length
+      };
+    }).sort((a, b) => b.score - a.score);
   };
 
-  const filteredTasks = filterTasks();
-  const categories = Array.from(new Set(tasks.map(t => t.crime_category || 'Other')));
-
-  // Process Ranking Data
-  const rankingData = officers.map(officer => {
-    const officerTasks = filteredTasks.filter(t => t.assigned_to === officer.id);
-    const completedTasks = officerTasks.filter(t => t.status === 'Completed');
-    const totalPoints = completedTasks.reduce((sum, t) => sum + (t.difficulty_score || 0), 0);
-    
-    return {
-      ...officer,
-      totalTasks: officerTasks.length,
-      completedCount: completedTasks.length,
-      totalPoints: totalPoints,
-      completionRate: officerTasks.length > 0 ? (completedTasks.length / officerTasks.length) * 100 : 0
-    };
-  });
-
-  const sortedBySuccess = [...rankingData].sort((a, b) => b.completedCount - a.completedCount);
-  const sortedByLoad = [...rankingData].sort((a, b) => b.totalTasks - a.totalTasks);
-
-  const maxTasks = Math.max(...rankingData.map(d => d.totalTasks), 1);
-  const maxSuccess = Math.max(...rankingData.map(d => d.completedCount), 1);
+  const rankedOfficers = calculateRanking();
+  const top3 = rankedOfficers.slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
-        
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-2 border-[#800000]/10 pb-8">
+    <div className="min-h-screen bg-slate-50 p-6 pb-20">
+      <header className="mb-12 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <div className="flex items-center gap-2 mb-2 text-[#800000]">
-               <Trophy size={24} />
-               <span className="text-[10px] font-black uppercase tracking-[0.3em]">Performance Analytics</span>
+            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
+              <Trophy className="text-[#800000]" size={28} />
+              หน่วยจัดอันดับผลงาน (Unit Ranking)
+            </h1>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">วัดผลประสิทธิภาพรายบุคคล กก.สส.2</p>
+          </div>
+          
+          <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 gap-1">
+            {[
+              { id: 'today', label: 'รายวัน' },
+              { id: 'month', label: 'รายเดือน' },
+              { id: 'year', label: 'รายปี' },
+              { id: 'all', label: 'ทั้งหมด' }
+            ].map((range) => (
+              <button 
+                key={range.id}
+                onClick={() => setTimeRange(range.id as TimeRange)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  timeRange === range.id 
+                    ? 'bg-[#800000] text-white shadow-lg scale-105' 
+                    : 'bg-white text-slate-400 hover:bg-slate-50 border border-transparent'
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Historical Pickers */}
+        {timeRange !== 'all' && (
+          <div className="flex items-center gap-4 bg-white p-4 rounded-[24px] border border-slate-200 shadow-sm w-fit animate-in slide-in-from-left duration-500">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-[#800000]" />
+              <span className="text-[10px] font-black text-slate-400 uppercase">
+                {timeRange === 'today' ? 'ระบุวันที่:' : 'เลือกห้วงเวลา:'}
+              </span>
             </div>
-            <h1 className="text-4xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">Unit Ranking</h1>
-            <p className="text-sm text-slate-500 font-bold uppercase tracking-widest mt-1">วิเคราะห์ผลงาน กก.สส.2 บก.สส.ภ.8</p>
-          </div>
+            
+            {timeRange === 'today' && (
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-slate-50 border-none rounded-xl px-3 py-1.5 text-sm font-black text-[#800000] outline-none ring-1 ring-slate-200 focus:ring-[#800000]"
+              />
+            )}
 
-          {/* New Tactical Filter Bar */}
-          <div className="flex flex-wrap items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm gap-4">
-             <div className="flex items-center gap-2 px-3 border-r border-slate-100">
-                <Calendar size={14} className="text-slate-400" />
-                <select 
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-                  className="bg-transparent text-[11px] font-black uppercase outline-none text-slate-700 cursor-pointer"
-                >
-                  <option value="all">ทุกช่วงเวลา</option>
-                  <option value="week">สัปดาห์นี้</option>
-                  <option value="month">เดือนนี้</option>
-                  <option value="year">ปีนี้</option>
-                </select>
-             </div>
-             
-             <div className="flex items-center gap-2 px-3">
-                <Target size={14} className="text-slate-400" />
-                <select 
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="bg-transparent text-[11px] font-black uppercase outline-none text-slate-700 cursor-pointer"
-                >
-                  <option value="all">ทุกประเภทคดี</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-             </div>
-          </div>
-        </header>
+            {timeRange === 'month' && (
+              <select 
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                className="bg-slate-50 border-none rounded-xl px-3 py-1.5 text-sm font-black text-[#800000] outline-none ring-1 ring-slate-200 focus:ring-[#800000]"
+              >
+                {monthsTh.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+            )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Mission Success Chart */}
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-4 opacity-5"><Award size={120} /></div>
-             <div className="flex items-center justify-between mb-8 relative z-10">
-                <div className="flex items-center gap-3">
-                   <div className="bg-green-100 p-2 rounded-xl text-green-600"><Award size={24} /></div>
-                   <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Mission Success</h2>
-                </div>
-                <span className="text-[10px] font-black text-slate-400 uppercase">ปิดงานสำเร็จ</span>
-             </div>
-             <div className="space-y-6 relative z-10">
-                {sortedBySuccess.map((data, idx) => (
-                  <div key={data.id}>
-                    <div className="flex justify-between items-end mb-2">
-                       <Link href={`/officers/${data.id}`} className="font-bold text-slate-700 hover:text-[#800000] flex items-center gap-2">
-                          <span className={`text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full ${idx < 3 ? 'bg-yellow-500 text-white' : 'bg-slate-100 text-slate-400'}`}>{idx + 1}</span>
-                          {data.nick_name}
-                       </Link>
-                       <span className="text-sm font-black text-slate-800">{data.completedCount}</span>
-                    </div>
-                    <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                       <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-1000" style={{ width: `${(data.completedCount / maxSuccess) * 100}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-             </div>
+            {(timeRange === 'month' || timeRange === 'year') && (
+              <select 
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="bg-slate-50 border-none rounded-xl px-3 py-1.5 text-sm font-black text-[#800000] outline-none ring-1 ring-slate-200 focus:ring-[#800000]"
+              >
+                {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y + 543}</option>)}
+              </select>
+            )}
           </div>
+        )}
+      </header>
 
-          {/* Workload Distribution Chart */}
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 relative overflow-hidden group">
-             <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={120} /></div>
-             <div className="flex items-center justify-between mb-8 relative z-10">
-                <div className="flex items-center gap-3">
-                   <div className="bg-[#800000]/10 p-2 rounded-xl text-[#800000]"><BarChart3 size={24} /></div>
-                   <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Workload Flow</h2>
-                </div>
-                <span className="text-[10px] font-black text-slate-400 uppercase">งานที่มอบหมาย</span>
-             </div>
-             <div className="space-y-6 relative z-10">
-                {sortedByLoad.map((data) => (
-                  <div key={data.id}>
-                    <div className="flex justify-between items-end mb-2">
-                       <Link href={`/officers/${data.id}`} className="font-bold text-slate-700 hover:text-[#800000]">{data.nick_name}</Link>
-                       <span className="text-sm font-black text-slate-800">{data.totalTasks}</span>
-                    </div>
-                    <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                       <div className="h-full bg-gradient-to-r from-[#800000] to-red-500 transition-all duration-1000" style={{ width: `${(data.totalTasks / maxTasks) * 100}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-             </div>
-          </div>
-        </div>
+      {loading ? (
+        <div className="text-center py-20 text-[#800000] font-black animate-pulse uppercase tracking-[0.2em]">กำลังคำนวณคะแนนเกียรติยศ...</div>
+      ) : (
+        <div className="max-w-5xl mx-auto space-y-16">
+          {/* Podium UI */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end pt-10 px-4">
+            {/* Rank 2 */}
+            <div className="order-2 md:order-1 bg-white p-6 rounded-[32px] shadow-xl border-b-4 border-slate-200 text-center relative hover:scale-105 transition-transform">
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center border-4 border-white shadow-lg text-slate-400 font-black">2</div>
+              <p className="mt-6 font-black text-slate-800">{top3[1]?.nick_name || '-'}</p>
+              <div className="mt-2 text-2xl font-black text-[#800000]">{top3[1]?.score || 0}</div>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Points earned</p>
+            </div>
 
-        {/* Dynamic Insight Panels */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-           <div className="bg-[#020617] p-6 rounded-[2rem] text-white flex flex-col justify-center">
-              <p className="text-[#ffd700] text-[10px] font-black uppercase tracking-widest mb-1">Most Valuable Player</p>
-              <h3 className="text-2xl font-black uppercase">{sortedBySuccess[0]?.nick_name || 'N/A'}</h3>
-              <p className="text-slate-500 text-[9px] font-bold mt-2 uppercase tracking-tighter">Based on Selected Filters</p>
-           </div>
-           
-           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-              <div className="flex items-center gap-2 mb-1 text-emerald-600">
-                 <TrendingUp size={16} />
-                 <p className="text-[10px] font-black uppercase tracking-widest">Efficiency</p>
+            {/* Rank 1 */}
+            <div className="order-1 md:order-2 bg-[#800000] p-10 rounded-[48px] shadow-[0_20px_50px_rgba(128,0,0,0.3)] border-b-8 border-[#ffd700] text-center relative scale-110 z-10">
+              <div className="absolute -top-14 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full bg-[#ffd700] flex items-center justify-center border-4 border-white shadow-2xl animate-bounce">
+                <Crown className="text-[#800000]" size={48} />
               </div>
-              <h3 className="text-3xl font-black text-slate-800">
-                {Math.round(rankingData.reduce((sum, d) => sum + d.completionRate, 0) / Math.max(rankingData.length, 1))}%
+              <p className="mt-8 font-black text-white text-2xl tracking-tight">{top3[0]?.nick_name || '-'}</p>
+              <p className="text-[10px] text-[#ffd700] font-black uppercase tracking-[0.2em] mt-1">{top3[0]?.specialty || 'The Master'}</p>
+              <div className="mt-6 text-5xl font-black text-white">{top3[0]?.score || 0}</div>
+              <p className="text-[10px] text-white/40 font-bold uppercase mt-2">
+                {timeRange === 'today' ? `วันที่ ${new Date(selectedDate).toLocaleDateString('th-TH')}` : 
+                 timeRange === 'month' ? `ประจำเดือน ${monthsTh[selectedMonth]}` : 
+                 timeRange === 'year' ? `ประจำปี ${selectedYear + 543}` : 'ผลงานรวม'}
+              </p>
+            </div>
+
+            {/* Rank 3 */}
+            <div className="order-3 bg-white p-6 rounded-[32px] shadow-xl border-b-4 border-orange-100 text-center relative hover:scale-105 transition-transform">
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center border-4 border-white shadow-lg text-orange-400 font-black">3</div>
+              <p className="mt-6 font-black text-slate-800">{top3[2]?.nick_name || '-'}</p>
+              <div className="mt-2 text-2xl font-black text-[#800000]">{top3[2]?.score || 0}</div>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Points earned</p>
+            </div>
+          </div>
+
+          {/* List Table */}
+          <div className="bg-white rounded-[40px] shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">
+                อันดับ {timeRange === 'today' ? `วันที่ ${new Date(selectedDate).toLocaleDateString('th-TH')}` : 
+                       timeRange === 'month' ? `${monthsTh[selectedMonth]} ${selectedYear + 543}` : 
+                       timeRange === 'year' ? `พ.ศ. ${selectedYear + 543}` : 'ตลอดกาล'}
               </h3>
-              <p className="text-slate-400 text-[9px] font-bold uppercase mt-1">Average Completion Rate</p>
-           </div>
-
-           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-              <div className="flex items-center gap-2 mb-1 text-blue-600">
-                 <Shield size={16} />
-                 <p className="text-[10px] font-black uppercase tracking-widest">Operation Scope</p>
+              <div className="flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#ffd700]"></div>
+                <div className="w-2 h-2 rounded-full bg-[#800000]"></div>
               </div>
-              <h3 className="text-3xl font-black text-slate-800">{filteredTasks.length}</h3>
-              <p className="text-slate-400 text-[9px] font-bold uppercase mt-1">Missions in Current View</p>
-           </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-white text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-10 py-6">#</th>
+                    <th className="px-4 py-6">รายนาม</th>
+                    <th className="px-4 py-6 text-center">ความสำเร็จ</th>
+                    <th className="px-10 py-6 text-right">คะแนนรวม</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {rankedOfficers.map((officer, index) => (
+                    <tr key={officer.id} className="hover:bg-slate-50/80 transition-all group">
+                      <td className="px-10 py-6">
+                        <span className={`font-black text-lg ${index < 3 ? 'text-[#800000]' : 'text-slate-300'}`}>
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-6">
+                        <div>
+                          <p className="font-black text-slate-800 group-hover:text-[#800000] transition-colors">{officer.nick_name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{officer.specialty}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-6 text-center">
+                        <div className="inline-flex items-center gap-1 bg-slate-100 px-3 py-1 rounded-full text-[10px] font-black text-slate-600">
+                          <Star size={10} className="text-[#ffd700] fill-[#ffd700]" />
+                          {officer.taskCount} งาน
+                        </div>
+                      </td>
+                      <td className="px-10 py-6 text-right">
+                        <span className="font-black text-2xl text-slate-800 group-hover:scale-110 inline-block transition-transform">{officer.score}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }
