@@ -157,32 +157,39 @@ export async function POST(request: Request) {
         const target = source.type === 'group' ? source.groupId : senderId;
         await replyText(replyToken, `🆔 ห้องนี้คือ: ${target}\n👤 คุณคือ: ${senderId}`, token);
       }
-      // 4. ใครอยู่เวร (แสดง Flex Message พร้อมรูปโปรไฟล์)
+      // 4. ใครอยู่เวร (เวอร์ชันอัปเกรด ค้นหาชื่อแม่นยำขึ้น)
       else if (text === 'ใครอยู่เวร') {
-        const today = new Date().toISOString().split('T')[0]; // หาวันที่ปัจจุบัน
+        const today = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+        const todayDate = new Date(today).toISOString().split('T')[0];
         
         // 1. หาว่าใครเข้าเวรวันนี้จากตาราง duty_roster
         const { data: duty } = await supabase
           .from('duty_roster')
           .select('officer_name')
-          .eq('duty_date', today)
+          .eq('duty_date', todayDate)
           .maybeSingle();
 
         if (!duty) {
           await replyText(replyToken, "📅 ยังไม่มีข้อมูลเวรสำหรับวันนี้ครับ", token);
-          continue; // จบการทำงานสำหรับเงื่อนไขนี้
+          continue;
         }
 
-        // 2. เอาชื่อคนเข้าเวร ไปค้นหา line_user_id ในตาราง officers
-        // (ค้นหาจากชื่อจริง หรือ ชื่อเล่น เผื่อไว้ทั้งสองแบบ)
-        const { data: dutyOfficer } = await supabase
+        // 2. ดึงข้อมูลเจ้าหน้าที่ที่ลงทะเบียนแล้วทั้งหมดมาเทียบ (เหมือนใน Cron Job)
+        const { data: allOfficers } = await supabase
           .from('officers')
           .select('line_user_id, rank, name, nick_name')
-          .or(`name.ilike.%${duty.officer_name}%,nick_name.ilike.%${duty.officer_name}%`)
-          .maybeSingle();
+          .eq('line_status', 'approved');
 
-        // 3. ดึงรูปโปรไฟล์จาก LINE (ถ้าเจอ line_user_id)
-        let dutyPicUrl = 'https://img5.pic.in.th/file/secure-sv1/police-logo.png'; // รูปโลโก้สำรอง
+        // ค้นหาคนที่ชื่อจริง หรือชื่อเล่น อยู่ในชื่อตารางเวร
+        const dutyOfficer = allOfficers?.find(o => 
+          (o.name && duty.officer_name.includes(o.name)) || 
+          (o.nick_name && duty.officer_name.includes(o.nick_name))
+        );
+
+        // 3. ดึงรูปโปรไฟล์จาก LINE
+        // 💡 แก้ไข: เปลี่ยนรูปสำรองเป็นรูป Default Avatar แบบที่ LINE ไม่บล็อกแน่นอน
+        let dutyPicUrl = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'; 
+        
         if (dutyOfficer?.line_user_id) {
           try {
             const pRes = await fetch(`https://api.line.me/v2/bot/profile/${dutyOfficer.line_user_id}`, {
@@ -207,7 +214,7 @@ export async function POST(request: Request) {
           type: "bubble",
           hero: {
             type: "image",
-            url: dutyPicUrl, // รูปโปรไฟล์คนเข้าเวร
+            url: dutyPicUrl, // 🖼️ จะเป็นรูปผู้ใช้ หรือรูปรักษาความปลอดภัยหากหาไม่เจอ
             size: "full",
             aspectRatio: "1:1",
             aspectMode: "cover"
@@ -221,7 +228,7 @@ export async function POST(request: Request) {
               { 
                 type: "text", 
                 text: "📢 ประกาศเข้าเวรประจำวันนี้", 
-                color: "#c48651", // สีน้ำตาล
+                color: "#c48651", 
                 weight: "bold", 
                 size: "sm", 
                 align: "center" 
@@ -229,7 +236,7 @@ export async function POST(request: Request) {
               { 
                 type: "text", 
                 text: displayDutyName, 
-                color: "#cc0000", // สีแดง
+                color: "#cc0000", 
                 weight: "bold", 
                 size: "xl", 
                 align: "center", 
@@ -238,7 +245,7 @@ export async function POST(request: Request) {
               },
               { 
                 type: "text", 
-                text: `วันที่: ${today}`, 
+                text: `วันที่: ${new Date(todayDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`, 
                 color: "#555555", 
                 size: "sm", 
                 align: "center", 
