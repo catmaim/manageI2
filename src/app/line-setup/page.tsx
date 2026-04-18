@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sendLineMessage } from '@/lib/line';
-import { MessageSquare, Send, Save, CheckCircle2, AlertCircle, Info, ShieldAlert } from 'lucide-react';
+import { MessageSquare, Send, Save, CheckCircle2, AlertCircle, Info, ShieldAlert, User, Wifi, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LineSetupPage() {
@@ -11,14 +11,15 @@ export default function LineSetupPage() {
   const [testMsg, setTestMsg] = useState('GGS2 Assistant: ทดสอบการเชื่อมต่อระบบรักษาความปลอดภัย 🛡️');
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
+  const [personnelLogs, setPersonnelLogs] = useState<Record<string, any>>({});
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
   useEffect(() => {
     const savedId = localStorage.getItem('line_target_id');
     if (savedId) setTargetId(savedId);
     fetchLogs();
 
-    // Refresh logs every 10 seconds to catch new messages
     const interval = setInterval(fetchLogs, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -27,9 +28,44 @@ export default function LineSetupPage() {
     const { data } = await supabase
       .from('system_logs')
       .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5);
-    if (data) setLogs(data);
+      .order('created_at', { ascending: false }); // ดึงทั้งหมดมาจัดกลุ่ม
+    
+    if (data) {
+      setLogs(data.slice(0, 10)); // สำหรับ Webhook Logs ล่าสุด
+
+      // จัดกลุ่มข้อมูลรายบุคคล
+      const grouped: Record<string, any> = {};
+      data.forEach(log => {
+        const userId = log.details?.sender || log.details?.id;
+        if (!userId) return;
+
+        if (!grouped[userId]) {
+          grouped[userId] = {
+            id: userId,
+            officer_name: log.details?.officer_name || 'คนนอก / ยังไม่ยืนยันตัวตน',
+            history: [],
+            last_activity: log.created_at,
+            last_isp: 'N/A'
+          };
+        }
+
+        // เก็บประวัติ
+        grouped[userId].history.push({
+          time: log.created_at,
+          msg: log.message,
+          type: log.log_type,
+          details: log.details
+        });
+
+        // ดึง ISP ล่าสุดถ้าเป็นรายการ SECURITY_TRACE
+        if (log.log_type === 'SECURITY_TRACE' && log.details?.isp) {
+          if (grouped[userId].last_isp === 'N/A') {
+            grouped[userId].last_isp = log.details.isp;
+          }
+        }
+      });
+      setPersonnelLogs(grouped);
+    }
   };
 
   const handleSave = () => {
@@ -168,6 +204,83 @@ export default function LineSetupPage() {
           <p className="text-[9px] text-white/30 text-center font-bold italic">
             * คลิก "ใช้ ID นี้" เพื่อก๊อปปี้ไปวางในช่องตั้งค่าด้านบน
           </p>
+        </section>
+
+        {/* Personnel Activity Audit (Grouped by User ID) */}
+        <section className="bg-white rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden">
+          <div className="bg-slate-800 p-6 border-b border-slate-700 flex justify-between items-center">
+            <div>
+              <h2 className="text-white text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                <ShieldAlert size={16} className="text-orange-400" />
+                คลังประวัติกิจกรรมกำลังพล
+              </h2>
+              <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Personnel Activity Audit Log</p>
+            </div>
+            <span className="bg-[#ffd700] text-slate-900 px-3 py-1 rounded-full text-[9px] font-black">{Object.keys(personnelLogs).length} USERS</span>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {Object.values(personnelLogs).map((user: any) => (
+              <div key={user.id} className="p-6 hover:bg-slate-50 transition-all group">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#800000] group-hover:text-white transition-all">
+                      <User size={24} />
+                    </div>
+                    <div>
+                      <p className="font-black text-slate-800 text-lg leading-none">{user.officer_name}</p>
+                      <p className="font-mono text-[9px] text-slate-400 mt-1 uppercase">ID: {user.id}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Last ISP Detected</p>
+                      <p className={`text-xs font-bold mt-1 ${user.last_isp !== 'N/A' ? 'text-blue-600' : 'text-slate-300'}`}>
+                        {user.last_isp}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedUser(selectedUser === user.id ? null : user.id)}
+                      className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#800000] transition-all"
+                    >
+                      {selectedUser === user.id ? 'ปิดประวัติ' : 'ดูประวัติย้อนหลัง'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* History Timeline View */}
+                {selectedUser === user.id && (
+                  <div className="mt-6 space-y-4 border-t border-slate-100 pt-6 animate-in slide-in-from-top-2 duration-300">
+                    <h3 className="text-[10px] font-black text-[#800000] uppercase tracking-widest mb-4">Activity Timeline (ล่าสุด - อดีต)</h3>
+                    <div className="space-y-3">
+                      {user.history.map((h: any, idx: number) => (
+                        <div key={idx} className="flex gap-4 items-start pl-4 border-l-2 border-slate-100">
+                          <div className="min-w-[80px] text-right">
+                            <p className="text-[9px] font-black text-slate-400">{new Date(h.time).toLocaleDateString('th-TH')}</p>
+                            <p className="text-[11px] font-bold text-slate-600 leading-none">{new Date(h.time).toLocaleTimeString()}</p>
+                          </div>
+                          <div className="flex-1 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
+                              h.type === 'SECURITY_TRACE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {h.type}
+                            </span>
+                            <p className="text-sm font-bold text-slate-800 mt-1">{h.msg}</p>
+                            {h.details?.isp && (
+                              <div className="mt-2 flex items-center gap-3 text-[10px] font-bold text-blue-500">
+                                <span className="flex items-center gap-1"><Wifi size={10} /> {h.details.isp}</span>
+                                <span className="flex items-center gap-1"><MapPin size={10} /> {h.details.city || 'Unknown City'}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </section>
 
         <p className="text-center text-[9px] text-slate-400 font-bold uppercase tracking-widest">

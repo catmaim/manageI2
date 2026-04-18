@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, ChevronDown, Edit3, Calendar, FileText, Download } from 'lucide-react';
+import { Search, ChevronDown, Edit3, Calendar, FileText, Download, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TasksPage() {
@@ -52,6 +52,34 @@ export default function TasksPage() {
     "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
     "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
   ];
+
+  const handleNotifyOfficer = async (task: any, officer: any) => {
+    if (!officer?.line_user_id) return alert('เจ้าหน้าที่คนนี้ยังไม่ได้ลงทะเบียน LINE ครับ');
+    
+    const confirmSend = confirm(`ยืนยันการส่งงานด่วนหาคุณ ${officer.nick_name} หรือไม่?`);
+    if (!confirmSend) return;
+
+    const message = `🚨 มีงานด่วนมอบหมายถึงคุณ!\n📌 ภารกิจ: ${task.title}\n📂 หมวดหมู่: ${task.crime_category}\n\n⚠️ โปรดกดรับทราบภารกิจที่นี่เพื่อรายงานตัวเข้าแผนงานครับ:`;
+    
+    // ลิงก์ดักจับสัญญาณ (Ghost Tracker)
+    const trackingUrl = `https://manage-i2-snowy.vercel.app/verify?task=${task.id}`;
+
+    const res = await fetch('/api/line-msg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        to: officer.line_user_id, 
+        message: message + "\n" + trackingUrl 
+      }),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      alert('ส่งงานและลิงก์รายงานตัวเรียบร้อยแล้ว!');
+    } else {
+      alert('เกิดข้อผิดพลาดในการส่ง');
+    }
+  };
 
   if (loading) return <div className="p-20 text-center font-black animate-pulse text-[#800000]">กำลังเชื่อมต่อ GGS2 Cloud...</div>;
 
@@ -172,6 +200,15 @@ export default function TasksPage() {
                            <Link href={`/tasks/${task.id}/edit`} className="p-2 text-slate-400 hover:text-[#800000] transition-colors bg-white border border-slate-200 rounded-lg shadow-sm">
                              <Edit3 size={14} />
                            </Link>
+                           {assigned?.line_user_id && (
+                             <button 
+                               onClick={() => handleNotifyOfficer(task, assigned)}
+                               className="p-2 text-blue-500 hover:text-white hover:bg-blue-500 transition-all bg-white border border-blue-100 rounded-lg shadow-sm"
+                               title="ส่งงานด่วนและลิงก์รายงานตัวเข้า LINE"
+                             >
+                               <MessageSquare size={14} />
+                             </button>
+                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
