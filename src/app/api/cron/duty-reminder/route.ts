@@ -40,21 +40,27 @@ export async function GET(request: Request) {
       throw new Error(`Database error: ${dbError.message}`);
     }
 
-    // 3. ค้นหาข้อมูลเจ้าหน้าที่เพื่อเอา LINE ID มา Tag
+    // 3. ค้นหาข้อมูลเจ้าหน้าที่เพื่อเอา LINE ID มา Tag (ปรับปรุงให้ฉลาดขึ้น)
     console.log(`Searching for officer: ${duty.officer_name}`);
-    const { data: officer } = await supabase
+    
+    // ดึงรายชื่อเจ้าหน้าที่ทั้งหมดที่ยืนยันตัวตนแล้วมาเทียบ
+    const { data: allOfficers } = await supabase
       .from('officers')
-      .select('line_user_id, nick_name')
-      .or(`name.eq."${duty.officer_name}",nick_name.eq."${duty.officer_name}"`)
-      .eq('line_status', 'approved')
-      .maybeSingle();
+      .select('line_user_id, nick_name, name')
+      .eq('line_status', 'approved');
+
+    // ค้นหาคนที่ชื่อหรือชื่อเล่นไปโผล่ในชื่อตารางเวร
+    const officer = allOfficers?.find(o => 
+      (o.name && duty.officer_name.includes(o.name)) || 
+      (o.nick_name && duty.officer_name.includes(o.nick_name))
+    );
 
     // 4. เตรียมข้อความแจ้งเตือน (เพิ่มการ Tag ถ้ามี ID)
     let messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n`;
     
     const mentions = [];
     if (officer?.line_user_id) {
-      // เพิ่ม @Tag เข้าไปในข้อความ
+      // ใช้ชื่อเล่นในการ Tag เพื่อความเป็นกันเอง
       const tagPlaceholder = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
       messageText += `👉 ${tagPlaceholder} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
       
