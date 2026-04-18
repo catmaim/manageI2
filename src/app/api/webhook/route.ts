@@ -69,13 +69,22 @@ export async function POST(request: Request) {
       
       // --- 🕹️ COMMANDS LOGIC ---
 
-      // 1. ผมชื่ออะไร (แบบในรูปตัวอย่าง)
+      // 1. ผมชื่ออะไร (ดึงข้อมูลจริงจาก Supabase)
       if (text === 'ผมชื่ออะไร') {
+        // เช็คว่ามีข้อมูลในฐานข้อมูลหรือไม่
+        const isRegistered = !!officer; 
+        
+        // จัดเตรียมข้อมูลที่จะแสดง (ถ้ามีข้อมูลใช้ข้อมูล DB, ถ้าไม่มีให้บอกว่ายังไม่ลงทะเบียน)
+        const displayName = isRegistered ? `${officer.rank || ''}${officer.name || ''}` : lineProfile.displayName;
+        const subName = isRegistered ? `ชื่อเล่น: ${officer.nick_name || '-'}` : "ยังไม่ได้ลงทะเบียนในระบบ";
+        const statusColor = officer?.line_status === 'approved' ? "#064e3b" : "#cc0000"; // เขียวถ้าอนุมัติ, แดงถ้ารอ
+        const statusText = officer?.line_status === 'approved' ? "✅ ยืนยันตัวตนสำเร็จ" : (isRegistered ? "⏳ รอแอดมินอนุมัติ" : "❌ กรุณาลงทะเบียน");
+
         const badgeFlex = {
           type: "bubble",
           hero: {
             type: "image",
-            url: lineProfile.pictureUrl, // 🖼️ ดึงรูปโปรไฟล์จริงมาแสดง
+            url: lineProfile.pictureUrl, // 🖼️ ดึงรูปจาก LINE
             size: "full",
             aspectRatio: "1:1",
             aspectMode: "cover"
@@ -83,13 +92,13 @@ export async function POST(request: Request) {
           body: {
             type: "box", 
             layout: "vertical", 
-            backgroundColor: "#f2f3f5", // พื้นหลังสีเทาอ่อนแบบในรูป
+            backgroundColor: "#f2f3f5", // สีเทาอ่อน
             paddingAll: "20px",
             contents: [
               { 
                 type: "text", 
-                text: "อายุการใช้งานของคุณหมดอายุแล้ว", 
-                color: "#cc0000", // สีแดง
+                text: displayName, // ดึง ยศ และ ชื่อ จากตาราง officers
+                color: "#cc0000", // สีแดงตามแบบ
                 weight: "bold", 
                 size: "xl", 
                 align: "center", 
@@ -97,9 +106,19 @@ export async function POST(request: Request) {
               },
               { 
                 type: "text", 
-                text: "วันที่หมดอายุของท่านคือวันที่ 21/09/2568.\nกรุณาติดต่อผู้ดูแลเพื่อทำการต่ออายุสมาชิก", 
-                color: "#555555", // สีเทาเข้ม
-                size: "sm", 
+                text: subName, // ดึงชื่อเล่นมาแสดงบรรทัดรอง
+                color: "#555555", 
+                size: "md", 
+                align: "center", 
+                wrap: true, 
+                margin: "sm" 
+              },
+              { 
+                type: "text", 
+                text: statusText, // ดึงสถานะ line_status มาประมวลผล
+                color: statusColor, 
+                size: "md", 
+                weight: "bold",
                 align: "center", 
                 wrap: true, 
                 margin: "lg" 
@@ -117,18 +136,17 @@ export async function POST(request: Request) {
                 type: "button", 
                 action: { 
                   type: "uri", 
-                  label: "ติดต่อผู้ดูแล", 
-                  // 🔗 ใส่ลิงก์ LINE ของแอดมิน หรือลิงก์ที่ต้องการให้กดตรงนี้ได้เลยครับ
+                  label: "📍 รายงานตัว (GPS)", 
                   uri: "https://manage-i2-snowy.vercel.app/verify" 
                 }, 
                 style: "primary", 
-                color: "#c48651", // สีน้ำตาลแบบในรูป
+                color: "#c48651", // ปุ่มสีน้ำตาลตามแบบ
                 height: "md" 
               }
             ]
           }
         };
-        await replyFlex(replyToken, "แจ้งเตือนสถานะการใช้งาน", badgeFlex, token);
+        await replyFlex(replyToken, "ข้อมูลประจำตัว", badgeFlex, token);
       }
       // 2. วิธีใช้
       else if (text === 'วิธีใช้' || text === 'help' || text === 'ช่วยเหลือ') {
