@@ -18,9 +18,11 @@ async function replyFlex(replyToken: string, altText: string, contents: any, tok
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ replyToken, messages: [{ type: 'flex', altText, contents }] }),
   });
+  
   if (!res.ok) {
     const err = await res.json();
-    await replyText(replyToken, `❌ ระบบขัดข้อง: ${err.message || 'Unknown'}`, token);
+    // 💡 แก้ไข: ให้ Log error ลง Console แทน เพราะ replyToken ถูก LINE ยกเลิกไปแล้ว จะตอบกลับซ้ำไม่ได้
+    console.error('❌ LINE Flex Error:', JSON.stringify(err, null, 2));
   }
 }
 
@@ -64,32 +66,44 @@ export async function POST(request: Request) {
         log_type: 'LINE_MSG', message: `💬 [${logName}] ${text}`, 
         details: { target: source.type === 'group' ? source.groupId : senderId, sender: senderId, line_name: lineProfile.displayName, officer_name: officer?.nick_name || null } 
       }]);
+      
       // --- 🕹️ COMMANDS LOGIC ---
 
       // 1. ผมชื่ออะไร (Digital Badge)
       if (text === 'ผมชื่ออะไร') {
         const badgeColor = officer?.line_status === 'approved' ? "#064e3b" : "#800000";
         const badgeStatus = officer?.line_status === 'approved' ? "✅ ยืนยันตัวตนสำเร็จ" : "⏳ รออนุมัติ";
+        
         const badgeFlex = {
           type: "bubble",
+          // 🖼️ เพิ่มบล็อก hero เพื่อแสดงรูปโปรไฟล์ขนาดใหญ่เต็มหน้ากว้าง
+          hero: {
+            type: "image",
+            url: lineProfile.pictureUrl,
+            size: "full",
+            aspectRatio: "1:1", // บังคับรูปเป็นสี่เหลี่ยมจัตุรัส
+            aspectMode: "cover" // ไม่ให้รูปเบี้ยว
+          },
           body: {
             type: "box", layout: "vertical", backgroundColor: badgeColor, paddingAll: "0px",
             contents: [
+              // 📝 ส่วนที่ 1: ข้อมูลส่วนตัว (จัดกึ่งกลางให้เข้ากับรูปใหญ่)
               {
-                type: "box", layout: "horizontal", paddingAll: "25px",
+                type: "box", layout: "vertical", paddingAll: "20px",
                 contents: [
-                  { type: "box", layout: "vertical", flex: 1, contents: [{ type: "image", url: lineProfile.pictureUrl, size: "full", aspectRatio: "1:1", aspectMode: "cover", cornerRadius: "xl" }] },
-                  { type: "box", layout: "vertical", flex: 2, paddingLeft: "15px", contents: [
-                    { type: "text", text: officer?.nick_name || lineProfile.displayName, color: "#ffffff", weight: "bold", size: "lg" },
-                    { type: "text", text: officer ? `${officer.rank}${officer.name}` : "ยังไม่ได้ลงทะเบียน", color: "#ffffff", size: "xs", opacity: 0.7, wrap: true },
-                    { type: "text", text: badgeStatus, color: "#ffd700", size: "xs", weight: "bold", margin: "md" }
-                  ]}
+                  { type: "text", text: officer?.nick_name || lineProfile.displayName, color: "#ffffff", weight: "bold", size: "xl", align: "center" },
+                  { type: "text", text: officer ? `${officer.rank || ''}${officer.name || ''}` : "ยังไม่ได้ลงทะเบียน", color: "#ffffff", size: "sm", opacity: 0.8, wrap: true, align: "center", margin: "sm" },
+                  { type: "text", text: badgeStatus, color: "#ffd700", size: "md", weight: "bold", align: "center", margin: "md" }
                 ]
               },
-              { type: "box", layout: "vertical", paddingAll: "15px", backgroundColor: "#00000033", contents: [
-                { type: "text", text: `ID: ${senderId}`, color: "#ffffff66", size: "xxs", wrap: true },
-                { type: "button", action: { type: "uri", label: "📍 รายงานตัว (GPS)", uri: "https://manage-i2-snowy.vercel.app/verify" }, style: "primary", color: "#ffffff22", margin: "sm", height: "sm" }
-              ]}
+              // 🔘 ส่วนที่ 2: ไอดี และ ปุ่มกด
+              { 
+                type: "box", layout: "vertical", paddingAll: "15px", backgroundColor: "#00000033", 
+                contents: [
+                  { type: "text", text: `ID: ${senderId}`, color: "#ffffff", opacity: 0.4, size: "xxs", wrap: true, align: "center" },
+                  { type: "button", action: { type: "uri", label: "📍 รายงานตัว (GPS)", uri: "https://manage-i2-snowy.vercel.app/verify" }, style: "primary", color: "#555555", margin: "md", height: "sm" }
+                ]
+              }
             ]
           }
         };
