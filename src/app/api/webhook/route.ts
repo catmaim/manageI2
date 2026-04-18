@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         } else {
           debugInfo += `PROFILE_ERR: ${pRes.status}\n`;
         }
-      } catch (e) { debugInfo += `PROFILE_CRASH: ${e.message}\n`; }
+      } catch (e: any) { debugInfo += `PROFILE_CRASH: ${e?.message}\n`; }
 
       // 2. ลองคุยกับ Supabase
       try {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         
         if (dbErr) debugInfo += `DB_ERR: ${dbErr.message}\n`;
         else debugInfo += `OFFICER: ${officer ? officer.nick_name : 'Not Found'}\n`;
-      } catch (e) { debugInfo += `DB_CRASH: ${e.message}\n`; }
+      } catch (e: any) { debugInfo += `DB_CRASH: ${e?.message}\n`; }
 
       // 3. บันทึก Log (ถ้าพังตรงนี้ให้ข้ามไป)
       try {
