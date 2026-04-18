@@ -60,17 +60,14 @@ export async function GET(request: Request) {
     const mentions = [];
 
     if (officer?.line_user_id) {
-      // 🌟 ใช้ชื่อที่เขาใช้ในแอป LINE จริงๆ ในการ Tag (เพื่อให้ขึ้นสีฟ้า)
       const tagText = `@${officer.line_display_name || officer.nick_name || 'เจ้าหน้าที่'}`;
-      
-      // บันทึกตำแหน่ง: เริ่มที่ 0, ความยาวใช้ .length (UTF-16)
       mentions.push({
         index: 0,
         length: tagText.length,
         userId: officer.line_user_id
       });
 
-      messageText = `${tagText} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
+      messageText = `${tagText} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n\n⚠️ โปรดกดรับทราบภารกิจเพื่อยืนยันตัวตน:\nhttps://manage-i2-snowy.vercel.app/verify`;
     } else {
       messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
     }

