@@ -55,21 +55,26 @@ export async function GET(request: Request) {
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
 
-    // 4. เตรียมข้อความแจ้งเตือน (ใช้ท่าไม้ตาย Index 0 เพื่อความชัวร์ 100%)
+    // 4. เตรียมข้อความแจ้งเตือน (ใช้การนับ .length แบบมาตรฐาน UTF-16)
     let messageText = '';
     const mentions = [];
 
     if (officer?.line_user_id) {
-      const tagText = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
+      const nick = officer.nick_name || 'เจ้าหน้าที่';
+      const tagPlaceholder = `@${nick}`;
+
+      // บันทึกตำแหน่ง: เริ่มที่ 0, ความยาวใช้ .length (UTF-16)
       mentions.push({
         index: 0,
-        length: [...tagText].length,
+        length: tagPlaceholder.length,
         userId: officer.line_user_id
       });
-      messageText = `${tagText} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
+
+      messageText = `${tagPlaceholder} 📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
     } else {
-      messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
+      messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n⚠️ โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!`;
     }
+
 
     messageText += `\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
 
