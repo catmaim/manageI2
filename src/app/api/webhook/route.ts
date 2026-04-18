@@ -56,19 +56,42 @@ export async function POST(request: Request) {
           if (!nickname) {
             await replyLine(replyToken, "กรุณาระบุชื่อเล่นด้วยครับ เช่น 'ลงทะเบียน บิว'", token);
           } else {
-            const { data } = await supabase.from('officers').update({ line_user_id: senderId }).ilike('nick_name', `%${nickname}%`).select();
+            // บันทึก ID แต่ตั้งสถานะเป็น pending (รออนุมัติ)
+            const { data } = await supabase
+              .from('officers')
+              .update({ 
+                line_user_id: senderId,
+                line_status: 'pending' // เพิ่มการบันทึกสถานะ
+              })
+              .ilike('nick_name', `%${nickname}%`)
+              .select();
+
             if (data && data.length > 0) {
-              await replyLine(replyToken, `✅ ลงทะเบียนสำเร็จ!\n👮‍♂️ ยินดีรับใช้ครับคุณ ${data[0].nick_name}`, token);
+              await replyLine(replyToken, `📝 ส่งคำขอลงทะเบียนสำเร็จ!\n👮‍♂️ รายชื่อ: ${data[0].rank}${data[0].name}\n\n⚠️ สถานะ: [รอแอดมินอนุมัติ]\nเมื่อแอดมินอนุมัติแล้ว ผมจะแจ้งให้ทราบอีกครั้งครับ`, token);
+              
+              // แจ้งเตือนแอดมินใน Log
+              await supabase.from('system_logs').insert([{ 
+                log_type: 'AUTH_REQUEST', 
+                message: `📢 คำขอลงทะเบียนใหม่จากคุณ ${data[0].nick_name}`, 
+                details: { id: senderId, officer_id: data[0].id }
+              }]);
             } else {
               await replyLine(replyToken, `❌ ไม่พบชื่อเล่น "${nickname}" ในระบบครับ`, token);
             }
           }
         }
-        // กรณีทักทายทั่วไป (ถ้ายังไม่ได้ลงทะเบียน)
+        // กรณีทักทายทั่วไป (ตรวจสอบว่าอนุมัติหรือยัง)
         else {
-          const { data: officer } = await supabase.from('officers').select('id').eq('line_user_id', senderId).maybeSingle();
+          const { data: officer } = await supabase
+            .from('officers')
+            .select('id, line_status')
+            .eq('line_user_id', senderId)
+            .maybeSingle();
+
           if (!officer) {
-            await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nรบกวนช่วยพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อรับแจ้งเตือนครับ\n\n(พิมพ์ 'วิธีใช้' เพื่อดูคำสั่งทั้งหมด)", token);
+            await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nรบกวนช่วยพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อเชื่อมต่อข้อมูลครับ", token);
+          } else if (officer.line_status === 'pending') {
+            await replyLine(replyToken, "⏳ บัญชีของคุณอยู่ระหว่าง [รอแอดมินอนุมัติ]\nโปรดรอสักครู่ หรือติดต่อหัวหน้ากฤษกรครับ", token);
           }
         }
 

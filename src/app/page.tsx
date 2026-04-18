@@ -11,47 +11,67 @@ export default function Dashboard() {
   const [officers, setOfficers] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [roster, setRoster] = useState<any[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [activityStats, setActivityStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    async function checkUserAndFetchData() {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
-      const { data: officersData } = await supabase.from('officers').select('*');
-      const { data: tasksData } = await supabase.from('tasks').select('*');
-      const { data: rosterData } = await supabase.from('duty_roster').select('*').order('duty_date', { ascending: true });
-      const { data: logsData } = await supabase.from('system_logs').select('details').eq('log_type', 'LINE_MSG');
-      
-      if (officersData) setOfficers(officersData);
-      if (tasksData) setTasks(tasksData);
-      if (rosterData) setRoster(rosterData);
-
-      //ประมวลผลสถิติการใช้งาน
-      if (logsData) {
-        const stats: Record<string, number> = {};
-        logsData.forEach(log => {
-          const name = log.details?.officer_name || 'ไม่ระบุชื่อ';
-          stats[name] = (stats[name] || 0) + 1;
-        });
-        const sorted = Object.entries(stats)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5); // เอา Top 5
-        setActivityStats(sorted);
-      }
-
-      setLoading(false);
-    }
-    checkUserAndFetchData();
+    fetchDashboardData();
   }, [router]);
+
+  async function fetchDashboardData() {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+
+    const { data: officersData } = await supabase.from('officers').select('*');
+    const { data: tasksData } = await supabase.from('tasks').select('*');
+    const { data: rosterData } = await supabase.from('duty_roster').select('*').order('duty_date', { ascending: true });
+    const { data: logsData } = await supabase.from('system_logs').select('details').eq('log_type', 'LINE_MSG');
+    
+    if (officersData) {
+      setOfficers(officersData);
+      // แยกรายชื่อที่รออนุมัติ
+      setPendingApprovals(officersData.filter(o => o.line_status === 'pending'));
+    }
+    if (tasksData) setTasks(tasksData);
+    if (rosterData) setRoster(rosterData);
+
+    if (logsData) {
+      const stats: Record<string, number> = {};
+      logsData.forEach(log => {
+        const name = log.details?.officer_name || 'ไม่ระบุชื่อ';
+        stats[name] = (stats[name] || 0) + 1;
+      });
+      const sorted = Object.entries(stats)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      setActivityStats(sorted);
+    }
+    setLoading(false);
+  }
+
+  const handleApprove = async (officerId: string, status: 'approved' | 'rejected') => {
+    const { error } = await supabase
+      .from('officers')
+      .update({ 
+        line_status: status,
+        // ถ้าปฏิเสธ ให้ล้าง Line User ID ทิ้งด้วย
+        line_user_id: status === 'rejected' ? null : undefined 
+      })
+      .eq('id', officerId);
+
+    if (!error) {
+      alert(status === 'approved' ? 'อนุมัติการใช้งานเรียบร้อย!' : 'ปฏิเสธคำขอเรียบร้อย');
+      fetchDashboardData(); // โหลดข้อมูลใหม่
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -124,6 +144,42 @@ export default function Dashboard() {
       </header>
 
       <main className="p-6 max-w-7xl mx-auto">
+        {/* Pending Registration Approvals */}
+        {pendingApprovals.length > 0 && (
+          <div className="mb-8 bg-orange-50 border-2 border-orange-200 rounded-[32px] p-6 shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-orange-500 rounded-lg text-white">
+                <Users size={20} />
+              </div>
+              <h2 className="text-lg font-black text-orange-800 uppercase tracking-tight">คำขอลงทะเบียนใหม่ ({pendingApprovals.length})</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pendingApprovals.map(officer => (
+                <div key={officer.id} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100 flex justify-between items-center group hover:border-orange-300 transition-all">
+                  <div>
+                    <p className="font-black text-slate-800">{officer.rank}{officer.name}</p>
+                    <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">ชื่อเล่น: {officer.nick_name}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleApprove(officer.id, 'rejected')}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    >
+                      ปฏิเสธ
+                    </button>
+                    <button 
+                      onClick={() => handleApprove(officer.id, 'approved')}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 shadow-md active:scale-95 transition-all"
+                    >
+                      อนุมัติ
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Today's Duty Highlight */}
         {todayDuty && (
           <div className="mb-8 bg-white rounded-3xl p-1 shadow-xl border border-slate-200 overflow-hidden group hover:shadow-2xl transition-all duration-500">
