@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, Users, ClipboardList, AlertCircle, Phone, LogOut, Send, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, AlertCircle, Phone, LogOut, Send, ShieldCheck, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { sendLineMessage } from '@/lib/line';
