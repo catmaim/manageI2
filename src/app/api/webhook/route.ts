@@ -72,11 +72,27 @@ export async function POST(request: Request) {
           }
         }
 
+        // --- ค้นหาชื่อเล่นเพื่อเก็บ Log ให้ดูง่าย ---
+        const { data: currentOfficer } = await supabase
+          .from('officers')
+          .select('nick_name, rank, name')
+          .eq('line_user_id', senderId)
+          .maybeSingle();
+
+        const officerDisplayName = currentOfficer 
+          ? `${currentOfficer.rank}${currentOfficer.nick_name}`
+          : 'Unknown User';
+
         // เก็บ Log ลง Supabase
         await supabase.from('system_logs').insert([{ 
           log_type: 'LINE_MSG', 
-          message: `Text: ${text}`, 
-          details: { id: targetId, type: type, sender: senderId }
+          message: `💬 [${officerDisplayName}] พิมพ์ว่า: ${text}`, 
+          details: { 
+            id: targetId, 
+            type: type, 
+            sender: senderId,
+            officer_name: currentOfficer?.nick_name || null 
+          }
         }]);
       }
     }
