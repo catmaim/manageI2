@@ -48,10 +48,73 @@ export async function POST(request: Request) {
           await replyLine(replyToken, `🆔 ID ห้องนี้คือ:\n${targetId}\n\n👤 ID ของคุณคือ:\n${senderId}`, token);
         }
         else if (text === 'ผมชื่ออะไร') {
-          const identityMsg = currentOfficer 
-            ? `👤 ข้อมูลระบบ: ${currentOfficer.rank}${currentOfficer.name}\n📱 ชื่อ LINE: ${lineProfile.displayName}\n🆔 ID: ${senderId}`
-            : `❌ ระบบยังไม่รู้จักคุณครับ\n📱 ชื่อ LINE: ${lineProfile.displayName}\n🆔 ID: ${senderId}\n\nรบกวนพิมพ์ "ลงทะเบียน [ชื่อเล่น]" ครับ`;
-          await replyLine(replyToken, identityMsg, token);
+          // --- สร้าง Digital Badge แบบ Flex Message ---
+          const badgeColor = currentOfficer?.line_status === 'approved' ? "#064e3b" : "#800000";
+          const badgeStatus = currentOfficer?.line_status === 'approved' ? "✅ ยืนยันตัวตนสำเร็จ" : "⏳ รอการตรวจสอบ";
+
+          const flexBadge = {
+            type: "bubble",
+            size: "giga",
+            body: {
+              type: "box",
+              layout: "vertical",
+              backgroundColor: badgeColor,
+              paddingAll: "0px",
+              contents: [
+                {
+                  type: "box",
+                  layout: "vertical",
+                  paddingAll: "30px",
+                  contents: [
+                    {
+                      type: "box",
+                      layout: "horizontal",
+                      contents: [
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          flex: 1,
+                          contents: [
+                            { type: "image", url: lineProfile.pictureUrl || "https://img5.pic.in.th/file/secure-sv1/police-logo.png", size: "full", aspectRatio: "1:1", aspectMode: "cover", cornerRadius: "20px" }
+                          ]
+                        },
+                        {
+                          type: "box",
+                          layout: "vertical",
+                          flex: 2,
+                          paddingLeft: "20px",
+                          contents: [
+                            { type: "text", text: currentOfficer?.nick_name || lineProfile.displayName, weight: "bold", color: "#ffffff", size: "xl" },
+                            { type: "text", text: currentOfficer ? `${currentOfficer.rank}${currentOfficer.name}` : "ยังไม่ได้ลงทะเบียน", color: "#ffffff", size: "xs", opacity: 0.7, margin: "xs" },
+                            { type: "text", text: badgeStatus, color: "#ffd700", size: "xs", weight: "bold", margin: "md" }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      type: "box",
+                      layout: "vertical",
+                      margin: "xl",
+                      spacing: "sm",
+                      contents: [
+                        { type: "text", text: `ID: ${senderId}`, color: "#ffffff", size: "xxs", opacity: 0.4, fontStyle: "italic" },
+                        {
+                          type: "button",
+                          action: { type: "uri", label: "📍 เช็คอินรายงานตัว (GPS)", uri: "https://manage-i2-snowy.vercel.app/verify" },
+                          style: "secondary",
+                          height: "sm",
+                          color: "#ffffff",
+                          margin: "md"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          };
+
+          await replyFlex(replyToken, "บัตรประจำตัวดิจิทัล GGS2", flexBadge, token);
         }
         else if (text === 'ใครอยู่เวร' || text === 'เวรวันนี้') {
           const today = new Date().toISOString().split('T')[0];
@@ -143,6 +206,23 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Webhook Error:', error);
     return NextResponse.json({ success: false });
+  }
+}
+
+async function replyFlex(replyToken: string, altText: string, contents: any, token: string | undefined) {
+  if (!token) return { success: false };
+  try {
+    const response = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ 
+        replyToken, 
+        messages: [{ type: 'flex', altText, contents }] 
+      }),
+    });
+    return { success: response.ok };
+  } catch (error) {
+    return { success: false };
   }
 }
 
