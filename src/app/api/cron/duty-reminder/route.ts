@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export async function GET(request: Request) {
-  // 1. ตรวจสอบความปลอดภัย (ป้องกันคนอื่นมาแอบเรียก API นี้เล่น)
+  console.log('⏰ Cron Job: Duty Reminder Triggered');
+
+  // 1. ตรวจสอบความปลอดภัย
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isVercelCron = request.headers.get('x-vercel-cron') === 'true'; // เช็คว่าเป็นระบบ Vercel เรียกเองไหม
+
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !isVercelCron) {
+    console.error('❌ Unauthorized: Invalid auth header and not a Vercel cron request');
     return new Response('Unauthorized', { status: 401 });
   }
 
