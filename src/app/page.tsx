@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [officers, setOfficers] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [roster, setRoster] = useState<any[]>([]);
+  const [activityStats, setActivityStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState(false);
   const router = useRouter();
@@ -27,10 +28,26 @@ export default function Dashboard() {
       const { data: officersData } = await supabase.from('officers').select('*');
       const { data: tasksData } = await supabase.from('tasks').select('*');
       const { data: rosterData } = await supabase.from('duty_roster').select('*').order('duty_date', { ascending: true });
+      const { data: logsData } = await supabase.from('system_logs').select('details').eq('log_type', 'LINE_MSG');
       
       if (officersData) setOfficers(officersData);
       if (tasksData) setTasks(tasksData);
       if (rosterData) setRoster(rosterData);
+
+      //ประมวลผลสถิติการใช้งาน
+      if (logsData) {
+        const stats: Record<string, number> = {};
+        logsData.forEach(log => {
+          const name = log.details?.officer_name || 'ไม่ระบุชื่อ';
+          stats[name] = (stats[name] || 0) + 1;
+        });
+        const sorted = Object.entries(stats)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5); // เอา Top 5
+        setActivityStats(sorted);
+      }
+
       setLoading(false);
     }
     checkUserAndFetchData();
@@ -217,6 +234,50 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        {/* New Activity Leaderboard Section */}
+        <div className="mt-8 bg-white p-8 rounded-3xl shadow-xl border border-slate-200 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#ffd700] opacity-5 -mr-20 -mt-20 rounded-full"></div>
+          <h2 className="text-xl font-black mb-6 flex items-center gap-3 text-slate-800">
+            <div className="p-2 bg-[#800000] rounded-xl shadow-lg">
+              <Users size={20} className="text-[#ffd700]" />
+            </div>
+            ทำเนียบการใช้งาน (Activity Leaderboard)
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {activityStats.length > 0 ? activityStats.map((stat, index) => (
+              <div key={stat.name} className="relative group p-6 bg-slate-50 rounded-[24px] border border-slate-100 hover:border-[#800000]/20 transition-all hover:shadow-xl hover:-translate-y-1">
+                <div className="absolute top-4 right-4 text-4xl font-black text-slate-200 group-hover:text-[#ffd700]/30 transition-colors leading-none">
+                  #{index + 1}
+                </div>
+                <div className="relative z-10">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">เจ้าหน้าที่</p>
+                  <p className="text-xl font-black text-[#800000] truncate">{stat.name}</p>
+                  <div className="mt-4 flex items-end justify-between">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Activity</p>
+                      <p className="text-2xl font-black text-slate-800">{stat.count}</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white shadow-inner flex items-center justify-center border border-slate-100">
+                      <Send size={20} className="text-[#ffd700]" />
+                    </div>
+                  </div>
+                  <div className="mt-4 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                    <div 
+                      className="h-full bg-gradient-to-r from-[#800000] to-red-500 rounded-full shadow-lg transition-all duration-1000" 
+                      style={{ width: `${Math.min((stat.count / (activityStats[0]?.count || 1)) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="col-span-5 py-12 text-center">
+                <p className="text-slate-300 font-black uppercase tracking-widest text-sm animate-pulse">กำลังรวบรวมสถิติจาก GGS2 Cloud...</p>
+              </div>
+            )}
           </div>
         </div>
       </main>
