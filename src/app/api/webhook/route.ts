@@ -66,20 +66,41 @@ export async function POST(request: Request) {
         else if (text.startsWith('ลงทะเบียน')) {
           const nickname = text.replace('ลงทะเบียน', '').trim();
           if (!nickname) {
-            await replyLine(replyToken, "กรุณาระบุชื่อเล่นด้วยครับ", token);
-          } else {
-            const { data } = await supabase
-              .from('officers')
-              .update({ line_user_id: senderId, line_status: 'pending' })
-              .ilike('nick_name', `%${nickname}%`)
-              .select();
+             await replyLine(replyToken, "กรุณาระบุชื่อเล่นด้วยครับ", token);
+             continue;
+          }
 
-            if (data && data.length > 0) {
-              await replyLine(replyToken, `📝 รับคำขอของ "${data[0].nick_name}" แล้วครับ\n\n📱 ชื่อ LINE ของคุณ: ${lineProfile.displayName}\n⚠️ สถานะ: [รอแอดมินอนุมัติ]`, token);
-              await supabase.from('system_logs').insert([{ log_type: 'AUTH_REQUEST', message: `📢 คำขอใหม่จาก LINE: ${lineProfile.displayName} (ขอเป็น ${data[0].nick_name})`, details: { sender: senderId, officer_id: data[0].id, line_name: lineProfile.displayName } }]);
-            } else {
-              await replyLine(replyToken, `❌ ไม่พบชื่อเล่น "${nickname}" ในระบบครับ`, token);
-            }
+          // ก. เช็คว่า 'คนพิมพ์' เคยลงทะเบียนหรือยัง
+          if (currentOfficer) {
+            await replyLine(replyToken, `⚠️ คุณลงทะเบียนไว้แล้วในชื่อ "${currentOfficer.nick_name}" ครับ\nไม่สามารถลงทะเบียนซ้ำได้ หากต้องการเปลี่ยนข้อมูล โปรดติดต่อแอดมินครับ`, token);
+            continue;
+          }
+
+          // ข. เช็คว่า 'ชื่อที่จะลง' มีคนอื่นแย่งไปหรือยัง
+          const { data: nameTaken } = await supabase
+            .from('officers')
+            .select('id, nick_name')
+            .ilike('nick_name', `%${nickname}%`)
+            .not('line_user_id', 'is', null)
+            .maybeSingle();
+
+          if (nameTaken) {
+            await replyLine(replyToken, `❌ ชื่อเล่น "${nickname}" ถูกลงทะเบียนโดยผู้ใช้อื่นแล้วครับ\nหากนี่คือชื่อของคุณ โปรดแจ้งแอดมินเพื่อตรวจสอบครับ`, token);
+            continue;
+          }
+
+          // ค. ถ้าผ่านทุกเงื่อนไข ให้ดำเนินการลงทะเบียน (รออนุมัติ)
+          const { data } = await supabase
+            .from('officers')
+            .update({ line_user_id: senderId, line_status: 'pending' })
+            .ilike('nick_name', `%${nickname}%`)
+            .select();
+
+          if (data && data.length > 0) {
+            await replyLine(replyToken, `📝 รับคำขอของ "${data[0].nick_name}" แล้วครับ\n\n📱 ชื่อ LINE ของคุณ: ${lineProfile.displayName}\n⚠️ สถานะ: [รอแอดมินอนุมัติ]`, token);
+            await supabase.from('system_logs').insert([{ log_type: 'AUTH_REQUEST', message: `📢 คำขอใหม่: ${lineProfile.displayName} (ขอเป็น ${data[0].nick_name})`, details: { sender: senderId, officer_id: data[0].id, line_name: lineProfile.displayName } }]);
+          } else {
+            await replyLine(replyToken, `❌ ไม่พบชื่อเล่น "${nickname}" ในระบบครับ`, token);
           }
         }
         // 3. กรณีคุยทั่วไป
