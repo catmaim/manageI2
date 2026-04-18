@@ -83,10 +83,15 @@ export async function POST(request: Request) {
         } 
         // Logic: If someone says something else, check if they are registered
         else {
-          const { data: isKnown } = await supabase.from('officers').select('id').eq('line_user_id', senderId).single();
+          const { data: officer } = await supabase
+            .from('officers')
+            .select('id, nick_name')
+            .eq('line_user_id', senderId)
+            .maybeSingle(); // ใช้ maybeSingle แทน single เพื่อไม่ให้ error ถ้าไม่พบ
           
-          if (!isKnown && text !== 'เช็คไอดี') {
-            await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nรบกวนช่วยพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อให้ผมบันทึกข้อมูลและส่งแจ้งเตือนเวรให้คุณได้อย่างถูกต้องครับ", token);
+          if (!officer && text !== 'เช็คไอดี') {
+            const res = await replyLine(replyToken, "สวัสดีครับ! ผมยังไม่รู้จักคุณครับ 🤖\n\nรบกวนช่วยพิมพ์ 'ลงทะเบียน [ชื่อเล่น]' เพื่อให้ผมบันทึกข้อมูลและส่งแจ้งเตือนเวรให้คุณได้อย่างถูกต้องครับ\n\nตัวอย่าง: ลงทะเบียน กอล์ฟ", token);
+            console.log('Reply result:', res);
           }
         }
         
