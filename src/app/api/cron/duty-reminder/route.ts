@@ -55,17 +55,24 @@ export async function GET(request: Request) {
       (o.nick_name && duty.officer_name.includes(o.nick_name))
     );
 
-    // 4. เตรียมข้อความแจ้งเตือน (เพิ่มการ Tag ถ้ามี ID)
-    let messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n`;
+    // 4. เตรียมข้อความแจ้งเตือน
+    const intro = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n`;
     
+    let messageText = intro;
     const mentions = [];
+
     if (officer?.line_user_id) {
-      // ใช้ชื่อเล่นในการ Tag เพื่อความเป็นกันเอง
-      const tagPlaceholder = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
-      messageText += `👉 ${tagPlaceholder} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
+      const nick = officer.nick_name || 'เจ้าหน้าที่';
+      const tagPlaceholder = `@${nick}`;
+      const actionText = `👉 ${tagPlaceholder} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
       
+      // คำนวณตำแหน่งเริ่มต้น (Index) ของ @Tag ในข้อความทั้งหมด
+      const startIndex = messageText.length + 3; // +3 มาจาก "👉 " (รวมช่องว่าง)
+      
+      messageText += actionText;
+
       mentions.push({
-        index: messageText.indexOf(tagPlaceholder),
+        index: startIndex,
         length: tagPlaceholder.length,
         userId: officer.line_user_id
       });
