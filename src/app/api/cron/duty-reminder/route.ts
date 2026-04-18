@@ -40,25 +40,52 @@ export async function GET(request: Request) {
       throw new Error(`Database error: ${dbError.message}`);
     }
 
-    if (!duty) {
-      console.log('ℹ️ No duty found for today. Skipping notification.');
-      return NextResponse.json({ message: 'No duty scheduled for today', date: dateString });
+    // 3. ค้นหาข้อมูลเจ้าหน้าที่เพื่อเอา LINE ID มา Tag
+    console.log(`Searching for officer: ${duty.officer_name}`);
+    const { data: officer } = await supabase
+      .from('officers')
+      .select('line_user_id, nick_name')
+      .or(`name.eq."${duty.officer_name}",nick_name.eq."${duty.officer_name}"`)
+      .eq('line_status', 'approved')
+      .maybeSingle();
+
+    // 4. เตรียมข้อความแจ้งเตือน (เพิ่มการ Tag ถ้ามี ID)
+    let messageText = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ: ${duty.officer_name}\n`;
+    
+    const mentions = [];
+    if (officer?.line_user_id) {
+      // เพิ่ม @Tag เข้าไปในข้อความ
+      const tagPlaceholder = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
+      messageText += `👉 ${tagPlaceholder} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
+      
+      mentions.push({
+        index: messageText.indexOf(tagPlaceholder),
+        length: tagPlaceholder.length,
+        userId: officer.line_user_id
+      });
+    } else {
+      messageText += `⚠️ แจ้งเตือน: โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ของท่านได้แล้วครับ!\n`;
     }
 
-    console.log(`👤 Duty found: ${duty.officer_name}`);
+    messageText += `\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
 
-    // 4. ตรวจสอบ Config ของ LINE
+    // 5. ส่งข้อความเข้า LINE
+    console.log('Sending message to LINE Group with Mentions...');
     const targetId = process.env.LINE_GROUP_ID;
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-    if (!targetId || !token) {
-      console.error('❌ Missing LINE Config (LINE_GROUP_ID or TOKEN)');
-      throw new Error('LINE Configuration missing in Environment Variables');
-    }
+    const lineBody: any = {
+      to: targetId,
+      messages: [{ 
+        type: 'text', 
+        text: messageText
+      }]
+    };
 
-    // 5. ส่งข้อความเข้า LINE
-    console.log('Sending message to LINE Group...');
-    const message = `📢 ประกาศแจ้งเวรปฏิบัติการประจำวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n\n👮‍♂️ ผู้เข้าเวรวันนี้คือ:\n${duty.officer_name}\n\n⚠️ แจ้งเตือน: โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ของท่านได้แล้วครับ!\n\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #DutyReminder`;
+    // ใส่ข้อมูล Mention ถ้ามี
+    if (mentions.length > 0) {
+      lineBody.messages[0].mention = { mentions };
+    }
 
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
@@ -66,10 +93,7 @@ export async function GET(request: Request) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        to: targetId,
-        messages: [{ type: 'text', text: message }]
-      }),
+      body: JSON.stringify(lineBody),
     });
 
     if (!res.ok) {

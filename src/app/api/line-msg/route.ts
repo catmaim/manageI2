@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  const { to, message } = await request.json();
+  const { to, message, mentions } = await request.json(); // เพิ่มการรับค่า mentions
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
   if (!token) {
@@ -12,6 +12,16 @@ export async function POST(request: Request) {
   const url = 'https://api.line.me/v2/bot/message/push';
 
   try {
+    const messageObject: any = {
+      type: 'text',
+      text: message,
+    };
+
+    // ถ้ามีการส่งข้อมูล Tag มาด้วย ให้ใส่เข้าไปใน message object
+    if (mentions && mentions.length > 0) {
+      messageObject.mention = { mentions };
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -19,13 +29,8 @@ export async function POST(request: Request) {
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        to: to, // User ID or Group ID
-        messages: [
-          {
-            type: 'text',
-            text: message,
-          },
-        ],
+        to: to,
+        messages: [messageObject],
       }),
     });
 

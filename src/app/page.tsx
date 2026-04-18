@@ -80,7 +80,6 @@ export default function Dashboard() {
   const handleNotifyLine = async (duty: any) => {
     setNotifying(true);
     try {
-      // ดึง ID ที่บันทึกไว้ในหน้า Line Setup (localStorage)
       const targetId = localStorage.getItem('line_target_id');
       
       if (!targetId) {
@@ -89,14 +88,42 @@ export default function Dashboard() {
         return;
       }
 
-      const message = `📢 แจ้งเวรปฏิบัติการวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n👮 ชื่อ: ${duty.officer_name}\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #ManagementPortal`;
+      // 🔍 ค้นหาเจ้าหน้าที่เพื่อเอา LINE ID มา Tag
+      const { data: officer } = await supabase
+        .from('officers')
+        .select('line_user_id, nick_name')
+        .or(`name.eq."${duty.officer_name}",nick_name.eq."${duty.officer_name}"`)
+        .eq('line_status', 'approved')
+        .maybeSingle();
+
+      let messageText = `📢 แจ้งเวรปฏิบัติการวันนี้\n🗓️ วันที่: ${new Date(duty.duty_date).toLocaleDateString('th-TH')}\n👮 ชื่อ: ${duty.officer_name}\n`;
       
-      const res = await sendLineMessage(targetId, message); 
-      
-      if (res.success) {
-        alert('ส่งการแจ้งเตือนสำเร็จ!');
+      const mentions = [];
+      if (officer?.line_user_id) {
+        const tagPlaceholder = `@${officer.nick_name || 'เจ้าหน้าที่'}`;
+        messageText += `👉 ${tagPlaceholder} เตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ได้เลยครับ!\n`;
+        mentions.push({
+          index: messageText.indexOf(tagPlaceholder),
+          length: tagPlaceholder.length,
+          userId: officer.line_user_id
+        });
       } else {
-        alert('เกิดข้อผิดพลาด: ' + (res.error?.message || 'ไม่สามารถส่งข้อความได้'));
+        messageText += `⚠️ แจ้งเตือน: โปรดเตรียมความพร้อมและเริ่มปฏิบัติหน้าที่ของท่านได้แล้วครับ!\n`;
+      }
+
+      messageText += `\n📞 เบอร์ติดต่อ: ${duty.phone}\n#GGS2 #ManagementPortal`;
+      
+      const res = await fetch('/api/line-msg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: targetId, message: messageText, mentions }),
+      });
+      
+      const resData = await res.json();
+      if (resData.success) {
+        alert('ส่งการแจ้งเตือนและ Tag เจ้าหน้าที่สำเร็จ!');
+      } else {
+        alert('เกิดข้อผิดพลาด: ' + (resData.error?.message || 'ไม่สามารถส่งข้อความได้'));
       }
     } catch (error) {
       console.error(error);
