@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     }
 
     // 🚨 แก้ไขจุดที่ 2: ดึงรูปโปรไฟล์จาก LINE API โดยตรง (รูปจะไม่หมดอายุ)
-    let profileImg = "https://img5.pic.in.th/file/secure-sv1/police-logo.png";
+    let profileImg = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // รูป default หากไม่มีหรือดึงไม่สำเร็จ
     if (officer?.line_user_id) {
       try {
         const pRes = await fetch(`https://api.line.me/v2/bot/profile/${officer.line_user_id}`, {
