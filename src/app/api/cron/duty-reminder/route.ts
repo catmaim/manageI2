@@ -110,7 +110,7 @@ export async function GET(request: Request) {
           layout: "vertical",
           backgroundColor: "#800000",
           contents: [
-            { type: "text", text: "GGS2 MISSION ALERT", color: "#ffd700", size: "xs", weight: "bold", tracking: "0.2em" },
+            { type: "text", text: "GGS2 MISSION ALERT", color: "#ffd700", size: "xs", weight: "bold" },
             { type: "text", text: "ประกาศเวรปฏิบัติหน้าที่", color: "#ffffff", size: "lg", weight: "bold", margin: "xs" }
           ]
         },
