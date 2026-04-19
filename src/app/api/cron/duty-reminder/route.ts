@@ -36,13 +36,13 @@ export async function GET(request: Request) {
 
     if (dbError) throw new Error(`Database error: ${dbError.message}`);
 
-    // 🚨 แก้ไขจุดที่ 1: ดักจับกรณีไม่มีคนเข้าเวรวันนี้ เพื่อไม่ให้ระบบ Crash
+    // 🚨 ดักจับกรณีไม่มีคนเข้าเวรวันนี้ เพื่อไม่ให้ระบบ Crash
     if (!duty) {
       console.log('✅ วันนี้ไม่มีเวรปฏิบัติการ ยกเลิกการแจ้งเตือน');
       return NextResponse.json({ success: true, message: 'No duty today' });
     }
 
-    console.log(`Searching for officer: ${duty.officer_name}`);
+    console.log(`🔍 Searching for officer: "${duty.officer_name}"`);
     
     // ค้นหาคนที่มีรายชื่อตรงกันเพื่อเอา LINE ID ไป Tag
     const { data: allOfficers } = await supabase
@@ -50,10 +50,18 @@ export async function GET(request: Request) {
       .select('line_user_id, nick_name, name, line_display_name')
       .eq('line_status', 'approved');
 
+    // 💡 ปรับปรุง: ใส่ .trim() เพื่อตัดช่องว่างหน้า/หลัง ป้องกันการหาชื่อไม่เจอเพราะเผลอเคาะ spacebar
     const officer: any = allOfficers?.find(o => 
-      (o.name && duty.officer_name.includes(o.name)) || 
-      (o.nick_name && duty.officer_name.includes(o.nick_name))
+      (o.name && duty.officer_name.includes(o.name.trim())) || 
+      (o.nick_name && duty.officer_name.includes(o.nick_name.trim()))
     );
+
+    // 📊 Log ตรวจสอบผลการค้นหา
+    if (officer) {
+      console.log(`✅ MATCH FOUND: ${officer.name || officer.nick_name} | UID: ${officer.line_user_id}`);
+    } else {
+      console.log(`❌ NO MATCH IN DB: ไม่พบใครที่ชื่อตรงกับตารางเวรเลย (ระบบจะส่งเวรแบบไม่มี Tag และใช้รูปพื้นฐาน)`);
+    }
 
     const targetId = process.env.LINE_GROUP_ID;
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -78,7 +86,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // 🚨 แก้ไขจุดที่ 2: ดึงรูปโปรไฟล์จาก LINE API โดยตรง (รูปจะไม่หมดอายุ)
+    // 🚨 แก้ไขจุดที่ 2: ดึงรูปโปรไฟล์จาก LINE API โดยตรง (พร้อม Log ตรวจสอบ)
     let profileImg = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // รูป default หากไม่มีหรือดึงไม่สำเร็จ
     if (officer?.line_user_id) {
       try {
@@ -87,10 +95,18 @@ export async function GET(request: Request) {
         });
         if (pRes.ok) {
           const p = await pRes.json();
-          if (p.pictureUrl) profileImg = p.pictureUrl; // ได้รูปจริงล่าสุดเสมอ
+          if (p.pictureUrl) {
+            profileImg = p.pictureUrl; // ได้รูปจริงล่าสุดเสมอ
+            console.log('✅ LINE API: ดึงรูปโปรไฟล์สำเร็จ!');
+          } else {
+            console.log('⚠️ LINE API: ไม่มีข้อผิดพลาด แต่ผู้ใช้อาจจะไม่ได้ตั้งรูปโปรไฟล์ไว้');
+          }
+        } else {
+          const errText = await pRes.text();
+          console.error(`❌ LINE API ERROR (Profile):`, errText);
         }
       } catch (e) {
-        console.error("ดึงรูปโปรไฟล์ไม่สำเร็จ:", e);
+        console.error("❌ Catch Error fetching profile:", e);
       }
     }
 
