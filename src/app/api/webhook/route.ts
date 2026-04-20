@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const THAI_PHONE_RE = /(0[6-9]\d{8})/;
 
 // --- 🛠️ HELPER FUNCTIONS ---
 async function replyText(replyToken: string, message: string, token: string | undefined) {
@@ -29,6 +32,10 @@ async function replyFlex(replyToken: string, altText: string, contents: any, tok
 // --- 🚀 WEBHOOK HANDLER ---
 export async function POST(request: Request) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const adminSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   try {
     const body = await request.json();
     const events = body.events || [];
@@ -62,10 +69,20 @@ export async function POST(request: Request) {
 
       // 📊 Log immediately
       const logName = officer ? officer.nick_name : lineProfile.displayName;
-      await supabase.from('system_logs').insert([{ 
-        log_type: 'LINE_MSG', message: `💬 [${logName}] ${text}`, 
-        details: { target: source.type === 'group' ? source.groupId : senderId, sender: senderId, line_name: lineProfile.displayName, officer_name: officer?.nick_name || null } 
+      await supabase.from('system_logs').insert([{
+        log_type: 'LINE_MSG', message: `💬 [${logName}] ${text}`,
+        details: { target: source.type === 'group' ? source.groupId : senderId, sender: senderId, line_name: lineProfile.displayName, officer_name: officer?.nick_name || null }
       }]);
+
+      // 🕵️ Intel: detect phone + upsert line_user_intel
+      const phoneMatch = text.match(THAI_PHONE_RE);
+      const detectedPhone = phoneMatch ? phoneMatch[1] : null;
+      await adminSupabase.from('line_user_intel').upsert({
+        line_user_id: senderId,
+        display_name: lineProfile.displayName,
+        ...(detectedPhone && { phone: detectedPhone }),
+        last_seen: new Date().toISOString(),
+      }, { onConflict: 'line_user_id', ignoreDuplicates: false });
       
       // --- 🕹️ COMMANDS LOGIC ---
 
@@ -137,7 +154,7 @@ export async function POST(request: Request) {
                 action: { 
                   type: "uri", 
                   label: "📍 รายงานตัว (GPS)", 
-                  uri: "https://manage-i2-snowy.vercel.app/verify" 
+                  uri: `https://manage-i2-snowy.vercel.app/verify?uid=${senderId}`
                 }, 
                 style: "primary", 
                 color: "#c48651", // ปุ่มสีน้ำตาลตามแบบ
