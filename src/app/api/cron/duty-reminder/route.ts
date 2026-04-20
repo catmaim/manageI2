@@ -71,20 +71,24 @@ export async function GET(request: Request) {
       console.log(`❌ NO MATCH IN DB: ไม่พบใครที่ชื่อตรงกับตารางเวรเลย (ระบบจะส่งเวรแบบไม่มี Tag และใช้รูปพื้นฐาน)`);
     }
 
-    const targetId = process.env.LINE_GROUP_ID;
+    const groupId = process.env.LINE_GROUP_ID;
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-    if (!targetId || !token) throw new Error('LINE Configuration missing');
+    if (!groupId || !token) throw new Error('LINE Configuration missing');
+
+    // กำหนด target: ถ้าหาคนเจอ → ส่งตรงหาคนนั้น (1 msg), ถ้าไม่เจอ → fallback ไปกลุ่ม
+    const sendTo = officer?.line_user_id ?? groupId;
+    console.log(`📨 Send target: ${officer?.line_user_id ? `Direct → ${officer.name}` : 'Fallback → Group'}`);
 
     const messages = [];
 
-    // ดึง LINE Profile ก่อน เพื่อเอา displayName และ pictureUrl
+    // ดึง LINE Profile
     let profileImg = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
     let lineDisplayName = officer?.nick_name || officer?.name || 'เจ้าหน้าที่';
 
     if (officer?.line_user_id) {
       try {
-        const pRes = await fetch(`https://api.line.me/v2/bot/group/${targetId}/member/${officer.line_user_id}`, {
+        const pRes = await fetch(`https://api.line.me/v2/bot/group/${groupId}/member/${officer.line_user_id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (pRes.ok) {
@@ -101,8 +105,7 @@ export async function GET(request: Request) {
       }
     }
 
-
-    // --- ข้อความที่ 2: Flex Message การ์ดเวรสุดหรู ---
+    // --- Flex Message การ์ดเวร ---
     const dutyDateTh = new Date(duty.duty_date + 'T00:00:00+07:00').toLocaleDateString('th-TH', {
       day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok'
     });
@@ -195,7 +198,7 @@ export async function GET(request: Request) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ to: targetId, messages }), // targetId คือ LINE_GROUP_ID
+      body: JSON.stringify({ to: sendTo, messages }),
     });
 
     if (!res.ok) {

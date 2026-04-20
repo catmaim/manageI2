@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token) return NextResponse.json({ error: 'LINE token missing' }, { status: 500 });
@@ -7,8 +9,8 @@ export async function GET() {
   const headers = { Authorization: `Bearer ${token}` };
 
   const [quotaRes, usageRes] = await Promise.all([
-    fetch('https://api.line.me/v2/bot/message/quota', { headers }),
-    fetch('https://api.line.me/v2/bot/message/quota/consumption', { headers }),
+    fetch('https://api.line.me/v2/bot/message/quota', { headers, cache: 'no-store' }),
+    fetch('https://api.line.me/v2/bot/message/quota/consumption', { headers, cache: 'no-store' }),
   ]);
 
   const quota = await quotaRes.json();
