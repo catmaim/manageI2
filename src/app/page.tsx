@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [activityStats, setActivityStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState(false);
+  const [lineQuota, setLineQuota] = useState<{ limit: number; used: number } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function Dashboard() {
         .slice(0, 5);
       setActivityStats(sorted);
     }
+    fetch('/api/line-quota').then(r => r.json()).then(setLineQuota).catch(() => {});
     setLoading(false);
   }
 
@@ -282,6 +284,39 @@ export default function Dashboard() {
           <StatCard title="กำลังพลในระบบ" value={totalOfficers} icon={<Users size={20} />} color="border-l-4 border-[#800000]" />
           <StatCard title="งานด่วน (ระดับ 4+)" value={highRiskTasks} icon={<AlertCircle size={20} />} color="border-l-4 border-orange-500" />
         </div>
+
+        {/* LINE Quota Widget */}
+        {lineQuota && (
+          <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Send size={14} className="text-green-500" />
+                LINE Message Quota (เดือนนี้)
+              </h2>
+              <span className="text-[10px] font-black text-slate-500">
+                {lineQuota.used} / {lineQuota.limit} ข้อความ
+              </span>
+            </div>
+            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  lineQuota.used / lineQuota.limit >= 0.8
+                    ? 'bg-red-500'
+                    : lineQuota.used / lineQuota.limit >= 0.6
+                    ? 'bg-yellow-400'
+                    : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min((lineQuota.used / lineQuota.limit) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-2">
+              <span className="text-[10px] text-slate-400 font-bold">เหลือ {lineQuota.limit - lineQuota.used} ข้อความ</span>
+              <span className="text-[10px] font-black text-slate-500">
+                {Math.round((lineQuota.used / lineQuota.limit) * 100)}%
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
