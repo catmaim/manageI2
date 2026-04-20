@@ -82,13 +82,12 @@ export async function GET(request: Request) {
       messages.push({
         type: 'text',
         text: `${tagText} ท่านมีภารกิจเข้าเวรวันนี้ครับ!`,
-        mention: {
-          mentions: [{
-            index: 0,
-            length: tagText.length,
-            userId: officer.line_user_id
-          }]
-        }
+        mentionees: [{
+          index: 0,
+          length: tagText.length,
+          userId: officer.line_user_id,
+          type: 'user'
+        }]
       });
     }
 
@@ -117,8 +116,8 @@ export async function GET(request: Request) {
     }
 
     // --- ข้อความที่ 2: Flex Message การ์ดเวรสุดหรู ---
-    const dutyDateTh = new Date(duty.duty_date).toLocaleDateString('th-TH', { 
-      day: 'numeric', month: 'long', year: 'numeric' 
+    const dutyDateTh = new Date(duty.duty_date + 'T00:00:00+07:00').toLocaleDateString('th-TH', {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok'
     });
 
     messages.push({
