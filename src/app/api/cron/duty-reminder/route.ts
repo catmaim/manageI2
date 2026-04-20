@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const adminSupabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(request: Request) {
   console.log('⏰ --- CRON START: Duty Reminder ---');
 
   // 1. ตรวจสอบความปลอดภัย
   const authHeader = request.headers.get('authorization');
-  const isVercelCron = request.headers.get('x-vercel-cron') === 'true';
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
   const cronSecret = process.env.CRON_SECRET;
 
   if (authHeader !== `Bearer ${cronSecret}` && !isVercelCron) {
@@ -45,7 +51,7 @@ export async function GET(request: Request) {
     console.log(`🔍 Searching for officer: "${duty.officer_name}"`);
     
     // ค้นหาคนที่มีรายชื่อตรงกันเพื่อเอา LINE ID ไป Tag
-    const { data: allOfficers } = await supabase
+    const { data: allOfficers } = await adminSupabase
       .from('officers')
       .select('line_user_id, nick_name, name, line_display_name')
       .eq('line_status', 'approved');
