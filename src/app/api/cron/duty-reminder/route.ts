@@ -2,11 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 
-const adminSupabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function GET(request: Request) {
   console.log('⏰ --- CRON START: Duty Reminder ---');
 
@@ -21,7 +16,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 2. ดึงวันที่วันนี้ (เวลาไทย) 
+    const adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // 2. ดึงวันที่วันนี้ (เวลาไทย)
     const now = new Date();
     // 💡 ปรับมาใช้ en-CA แทน fr-CA เพื่อให้ได้รูปแบบ YYYY-MM-DD ที่เป็นมาตรฐานสากล
     const dateString = new Intl.DateTimeFormat('en-CA', { 
