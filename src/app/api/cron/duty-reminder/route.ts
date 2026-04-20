@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     // ค้นหาคนที่มีรายชื่อตรงกันเพื่อเอา LINE ID ไป Tag
     const { data: allOfficers, error: officersError } = await adminSupabase
       .from('officers')
-      .select('line_user_id, nick_name, name, line_display_name')
+      .select('line_user_id, nick_name, name')
       .eq('line_status', 'approved');
 
     console.log(`👥 Officers found: ${allOfficers?.length ?? 0}`, officersError ? `| Error: ${officersError.message}` : '');
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
 
     // --- ข้อความที่ 1: สำหรับ Tag (Mention) ให้มือถือสั่น ---
     if (officer?.line_user_id) {
-      const tagText = `@${officer.line_display_name || officer.nick_name || 'เจ้าหน้าที่'}`;
+      const tagText = `@${officer.nick_name || officer.name || 'เจ้าหน้าที่'}`;
       messages.push({
         type: 'text',
         text: `${tagText} ท่านมีภารกิจเข้าเวรวันนี้ครับ!`,
