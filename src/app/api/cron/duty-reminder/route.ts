@@ -95,7 +95,7 @@ export async function GET(request: Request) {
     let profileImg = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // รูป default หากไม่มีหรือดึงไม่สำเร็จ
     if (officer?.line_user_id) {
       try {
-        const pRes = await fetch(`https://api.line.me/v2/bot/profile/${officer.line_user_id}`, {
+        const pRes = await fetch(`https://api.line.me/v2/bot/group/${targetId}/member/${officer.line_user_id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (pRes.ok) {
