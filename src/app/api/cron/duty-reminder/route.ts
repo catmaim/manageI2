@@ -51,10 +51,12 @@ export async function GET(request: Request) {
     console.log(`🔍 Searching for officer: "${duty.officer_name}"`);
     
     // ค้นหาคนที่มีรายชื่อตรงกันเพื่อเอา LINE ID ไป Tag
-    const { data: allOfficers } = await adminSupabase
+    const { data: allOfficers, error: officersError } = await adminSupabase
       .from('officers')
       .select('line_user_id, nick_name, name, line_display_name')
       .eq('line_status', 'approved');
+
+    console.log(`👥 Officers found: ${allOfficers?.length ?? 0}`, officersError ? `| Error: ${officersError.message}` : '');
 
     // 💡 ปรับปรุง: ใส่ .trim() เพื่อตัดช่องว่างหน้า/หลัง ป้องกันการหาชื่อไม่เจอเพราะเผลอเคาะ spacebar
     const officer: any = allOfficers?.find(o => 
