@@ -101,20 +101,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // --- ข้อความที่ 1: Tag (Mention) ด้วย displayName จริงจาก LINE ---
-    if (officer?.line_user_id) {
-      const tagText = `@${lineDisplayName}`;
-      messages.push({
-        type: 'text',
-        text: `${tagText} ท่านมีภารกิจเข้าเวรวันนี้ครับ!`,
-        mentionees: [{
-          index: 0,
-          length: tagText.length,
-          userId: officer.line_user_id,
-          type: 'user'
-        }]
-      });
-    }
 
     // --- ข้อความที่ 2: Flex Message การ์ดเวรสุดหรู ---
     const dutyDateTh = new Date(duty.duty_date + 'T00:00:00+07:00').toLocaleDateString('th-TH', {
