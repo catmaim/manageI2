@@ -78,9 +78,32 @@ export async function GET(request: Request) {
 
     const messages = [];
 
-    // --- ข้อความที่ 1: สำหรับ Tag (Mention) ให้มือถือสั่น ---
+    // ดึง LINE Profile ก่อน เพื่อเอา displayName และ pictureUrl
+    let profileImg = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+    let lineDisplayName = officer?.nick_name || officer?.name || 'เจ้าหน้าที่';
+
     if (officer?.line_user_id) {
-      const tagText = `@${officer.nick_name || officer.name || 'เจ้าหน้าที่'}`;
+      try {
+        const pRes = await fetch(`https://api.line.me/v2/bot/group/${targetId}/member/${officer.line_user_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (pRes.ok) {
+          const p = await pRes.json();
+          if (p.pictureUrl) profileImg = p.pictureUrl;
+          if (p.displayName) lineDisplayName = p.displayName;
+          console.log(`✅ LINE API: displayName="${lineDisplayName}"`);
+        } else {
+          const errText = await pRes.text();
+          console.error(`❌ LINE API ERROR (Profile):`, errText);
+        }
+      } catch (e) {
+        console.error("❌ Catch Error fetching profile:", e);
+      }
+    }
+
+    // --- ข้อความที่ 1: Tag (Mention) ด้วย displayName จริงจาก LINE ---
+    if (officer?.line_user_id) {
+      const tagText = `@${lineDisplayName}`;
       messages.push({
         type: 'text',
         text: `${tagText} ท่านมีภารกิจเข้าเวรวันนี้ครับ!`,
@@ -91,30 +114,6 @@ export async function GET(request: Request) {
           type: 'user'
         }]
       });
-    }
-
-    // 🚨 แก้ไขจุดที่ 2: ดึงรูปโปรไฟล์จาก LINE API โดยตรง (พร้อม Log ตรวจสอบ)
-    let profileImg = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"; // รูป default หากไม่มีหรือดึงไม่สำเร็จ
-    if (officer?.line_user_id) {
-      try {
-        const pRes = await fetch(`https://api.line.me/v2/bot/group/${targetId}/member/${officer.line_user_id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (pRes.ok) {
-          const p = await pRes.json();
-          if (p.pictureUrl) {
-            profileImg = p.pictureUrl; // ได้รูปจริงล่าสุดเสมอ
-            console.log('✅ LINE API: ดึงรูปโปรไฟล์สำเร็จ!');
-          } else {
-            console.log('⚠️ LINE API: ไม่มีข้อผิดพลาด แต่ผู้ใช้อาจจะไม่ได้ตั้งรูปโปรไฟล์ไว้');
-          }
-        } else {
-          const errText = await pRes.text();
-          console.error(`❌ LINE API ERROR (Profile):`, errText);
-        }
-      } catch (e) {
-        console.error("❌ Catch Error fetching profile:", e);
-      }
     }
 
     // --- ข้อความที่ 2: Flex Message การ์ดเวรสุดหรู ---
