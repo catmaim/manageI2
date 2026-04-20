@@ -50,7 +50,7 @@ export default function LineSetupPage() {
         if (!grouped[userId]) {
           grouped[userId] = {
             id: userId,
-            officer_name: log.details?.officer_name || 'บุคคลภายนอก / ยังไม่ยืนยัน',
+            officer_name: log.details?.officer_name || log.details?.line_name || 'บุคคลภายนอก / ยังไม่ยืนยัน',
             history: [],
             last_isp: 'N/A'
           };
