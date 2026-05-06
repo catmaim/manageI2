@@ -167,7 +167,7 @@ export async function POST(request: Request) {
       }
       // 2. วิธีใช้
       else if (text === 'วิธีใช้' || text === 'help' || text === 'ช่วยเหลือ') {
-        await replyText(replyToken, "📋 คำสั่งที่ใช้ได้:\n1. ลงทะเบียน [ชื่อเล่น]\n2. ใครอยู่เวร\n3. เช็คไอดี\n4. ผมชื่ออะไร", token);
+        await replyText(replyToken, "📋 คำสั่งที่ใช้ได้:\n1. ลงทะเบียน [ชื่อเล่น]\n2. ใครอยู่เวร\n3. พรุ่งนี้ (เวรพรุ่งนี้)\n4. เช็คไอดี\n5. ผมชื่ออะไร", token);
       }
       // 3. เช็คไอดี
       else if (text === 'เช็คไอดี') {
@@ -273,6 +273,81 @@ export async function POST(request: Request) {
         };
 
         await replyFlex(replyToken, `เวรวันนี้: ${displayDutyName}`, dutyFlex, token);
+      }
+      // 5. เวรพรุ่งนี้
+      else if (text.includes('พรุ่งนี้')) {
+        const tomorrowBkk = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric', month: '2-digit', day: '2-digit'
+        }).format(new Date(Date.now() + 86400000));
+
+        const { data: tomorrowDuty } = await supabase
+          .from('duty_roster')
+          .select('officer_name')
+          .eq('duty_date', tomorrowBkk)
+          .maybeSingle();
+
+        if (!tomorrowDuty) {
+          await replyText(replyToken, "📅 ยังไม่มีข้อมูลเวรสำหรับพรุ่งนี้ครับ", token);
+          continue;
+        }
+
+        const { data: allOfficersTmr } = await supabase
+          .from('officers')
+          .select('line_user_id, rank, name, nick_name')
+          .eq('line_status', 'approved');
+
+        const dutyOfficerTmr = allOfficersTmr?.find(o =>
+          (o.name && tomorrowDuty.officer_name.includes(o.name)) ||
+          (o.nick_name && tomorrowDuty.officer_name.includes(o.nick_name))
+        );
+
+        let tmrPicUrl = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+        if (dutyOfficerTmr?.line_user_id) {
+          try {
+            const pRes = await fetch(`https://api.line.me/v2/bot/profile/${dutyOfficerTmr.line_user_id}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (pRes.ok) {
+              const p = await pRes.json();
+              if (p.pictureUrl) tmrPicUrl = p.pictureUrl;
+            }
+          } catch (e) {
+            console.error("ดึงรูปคนเข้าเวรพรุ่งนี้ไม่สำเร็จ:", e);
+          }
+        }
+
+        const displayTmrName = dutyOfficerTmr
+          ? `${dutyOfficerTmr.rank || ''}${dutyOfficerTmr.name || ''} (${dutyOfficerTmr.nick_name || ''})`
+          : tomorrowDuty.officer_name;
+
+        const tomorrowDisplay = new Date(tomorrowBkk + 'T00:00:00+07:00').toLocaleDateString('th-TH', {
+          day: 'numeric', month: 'short', year: 'numeric'
+        });
+
+        const tomorrowFlex = {
+          type: "bubble",
+          hero: {
+            type: "image",
+            url: tmrPicUrl,
+            size: "full",
+            aspectRatio: "1:1",
+            aspectMode: "cover"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            backgroundColor: "#f2f3f5",
+            paddingAll: "20px",
+            contents: [
+              { type: "text", text: "📅 เวรพรุ่งนี้", color: "#c48651", weight: "bold", size: "sm", align: "center" },
+              { type: "text", text: displayTmrName, color: "#cc0000", weight: "bold", size: "xl", align: "center", wrap: true, margin: "md" },
+              { type: "text", text: `วันที่: ${tomorrowDisplay}`, color: "#555555", size: "sm", align: "center", margin: "sm" }
+            ]
+          }
+        };
+
+        await replyFlex(replyToken, `เวรพรุ่งนี้: ${displayTmrName}`, tomorrowFlex, token);
       }
       // 6. กรณีคุยส่วนตัว (ถ้ายังไม่ลงทะเบียน)
       else if (source.type === 'user' && !officer) {
