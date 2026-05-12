@@ -167,7 +167,7 @@ export async function POST(request: Request) {
       }
       // 2. วิธีใช้
       else if (text === 'วิธีใช้' || text === 'help' || text === 'ช่วยเหลือ') {
-        await replyText(replyToken, "📋 คำสั่งที่ใช้ได้:\n1. ลงทะเบียน [ชื่อเล่น]\n2. ใครอยู่เวร\n3. พรุ่งนี้ (เวรพรุ่งนี้)\n4. เช็คไอดี\n5. ผมชื่ออะไร", token);
+        await replyText(replyToken, "📋 คำสั่งที่ใช้ได้:\n1. ลงทะเบียน [ชื่อเล่น]\n2. ใครอยู่เวร\n3. เวรพรุ่งนี้\n4. เช็คไอดี\n5. ผมชื่ออะไร", token);
       }
       // 3. เช็คไอดี
       else if (text === 'เช็คไอดี') {
@@ -275,7 +275,7 @@ export async function POST(request: Request) {
         await replyFlex(replyToken, `เวรวันนี้: ${displayDutyName}`, dutyFlex, token);
       }
       // 5. เวรพรุ่งนี้
-      else if (text.includes('พรุ่งนี้')) {
+      else if (text === 'เวรพรุ่งนี้') {
         const tomorrowBkk = new Intl.DateTimeFormat('en-CA', {
           timeZone: 'Asia/Bangkok',
           year: 'numeric', month: '2-digit', day: '2-digit'
